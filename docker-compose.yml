@@ -1,0 +1,171 @@
+# Apache Airflow 3.1.5 — orquestração do pipeline ETL (LocalExecutor)
+#
+# AVISO: configuração para desenvolvimento local. Não use em produção.
+#
+# Subir:    docker compose up -d
+# UI/REST:  http://localhost:8080   (login: airflow / airflow)
+# Derrubar: docker compose down              # mantém o metadata DB (volume)
+#           docker compose down --volumes    # apaga também o metadata DB
+#
+# Variáveis suportadas (ver arquivo .env):
+#   AIRFLOW_IMAGE_NAME  - imagem usada            (default: apache/airflow:3.1.5)
+#   AIRFLOW_UID         - UID dentro dos containers (default: 50000)
+#   AIRFLOW_PROJ_DIR    - base dos volumes          (default: .)
+
+x-airflow-common:
+  &airflow-common
+  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.5}
+  # Para adicionar dependências (ex.: provider do Spark), comente a linha "image"
+  # acima, crie um Dockerfile ao lado deste arquivo e descomente o "build" abaixo,
+  # depois rode `docker compose build`.
+  # build: .
+  env_file:
+    - ${ENV_FILE_PATH:-.env}
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    # Use _PIP_ADDITIONAL_REQUIREMENTS apenas para testes rápidos. Para o pipeline
+    # com Spark, prefira construir uma imagem própria (Dockerfile / build acima).
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+  volumes:
+    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    # Dados brutos do teste, disponíveis para as DAGs (somente leitura)
+    - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data:ro
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  # API server: serve a UI web e a REST API (porta 8080). Substitui o webserver
+  # das versões 2.x do Airflow.
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Componente obrigatório no Airflow 3.x: faz o parsing das DAGs em processo
+  # separado do scheduler.
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Necessário para operators "deferrable" / sensors assíncronos.
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Inicialização: cria pastas, migra o metadata DB e cria o usuário admin.
+  # As variáveis _AIRFLOW_DB_MIGRATE e _AIRFLOW_WWW_USER_CREATE são lidas pelo
+  # entrypoint da imagem oficial.
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /opt/airflow/{logs,dags,plugins,config}
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins,config}
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
+    user: "0:0"
+
+  # Acesso à CLI do Airflow para depuração: `docker compose --profile debug run --rm airflow-cli`
+  airflow-cli:
+    <<: *airflow-common
+    profiles:
+      - debug
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+    command:
+      - bash
+      - -c
+      - airflow
+    depends_on:
+      <<: *airflow-common-depends-on
+
+volumes:
+  postgres-db-volume:

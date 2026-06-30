@@ -30,6 +30,11 @@ spark-warehouse/
 metastore_db/
 derby.log
 
+# Airflow
+logs/
+config/airflow.cfg
+webserver_config.py
+
 # Outputs (gerados pelo pipeline do candidato)
 output/
 outputs/
