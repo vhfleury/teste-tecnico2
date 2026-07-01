@@ -10,7 +10,8 @@
 # Variáveis suportadas (ver arquivo .env):
 #   AIRFLOW_IMAGE_NAME  - imagem usada            (default: apache/airflow:3.1.5)
 #   AIRFLOW_UID         - UID dentro dos containers (default: 50000)
-#   AIRFLOW_PROJ_DIR    - base dos volumes          (default: .)
+#   AIRFLOW_PROJ_DIR    - base dos volumes do Airflow (dags/logs/config/plugins)
+#                         (default: ./airflow)
 
 x-airflow-common:
   &airflow-common
@@ -36,12 +37,12 @@ x-airflow-common:
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:
-    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
-    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
-    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
-    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
     # Dados brutos do teste, disponíveis para as DAGs (somente leitura)
-    - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data:ro
+    - ./data:/opt/airflow/data:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
