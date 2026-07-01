@@ -42,7 +42,6 @@ def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
         .option("encoding", "UTF-8")
         .csv(statics.VEICULOS_CSV)
     )
-    
     df = df.withColumn("source_file", F.lit(statics.VEICULOS_CSV)).withColumn(
         "ingested_at", F.current_timestamp()
     )
@@ -50,10 +49,8 @@ def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
     total = df.count()
     log.info("CSV read: %d records, %d columns", total, len(df.columns))
     destination = raw_path(ingest_date)
-    
     log.info("Writing raw layer to %s", destination)
     df.coalesce(1).write.mode("overwrite").parquet(destination)
-    
     log.info("Extraction finished - %d records written to raw", total)
 
     return {"layer": "raw", "path": destination, "records": total}
