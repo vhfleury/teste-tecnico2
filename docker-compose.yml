@@ -15,11 +15,11 @@
 
 x-airflow-common:
   &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.5}
-  # Para adicionar dependências (ex.: provider do Spark), comente a linha "image"
-  # acima, crie um Dockerfile ao lado deste arquivo e descomente o "build" abaixo,
-  # depois rode `docker compose build`.
-  # build: .
+  image: ${AIRFLOW_IMAGE_NAME:-bigcore-airflow-pyspark:3.1.5}
+  # Imagem custom (Dockerfile ao lado deste arquivo): apache/airflow + OpenJDK 17
+  # + PySpark (requirements.txt). Rebuilda automaticamente quando o Dockerfile
+  # ou requirements.txt mudam via `docker compose up --build`.
+  build: .
   env_file:
     - ${ENV_FILE_PATH:-.env}
   environment:
@@ -36,11 +36,17 @@ x-airflow-common:
     # com Spark, prefira construir uma imagem própria (Dockerfile / build acima).
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+    # Torna `connections`, `scripts` e `parser` importáveis pelas DAGs.
+    PYTHONPATH: '/opt/airflow'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-./airflow}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-./airflow}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
+    # Pacotes de código compartilhados pelas pipelines.
+    - ./connections:/opt/airflow/connections
+    - ./scripts:/opt/airflow/scripts
+    - ./parser:/opt/airflow/parser
     # Dados brutos do teste, disponíveis para as DAGs (somente leitura)
     - ./data:/opt/airflow/data:ro
   user: "${AIRFLOW_UID:-50000}:0"

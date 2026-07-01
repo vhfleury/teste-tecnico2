@@ -1,0 +1,9 @@
+veiculo_id,placa,marca,modelo,ano_fabricacao,tipo,capacidade_kg,capacidade_paletes,km_atual,status,data_ultima_revisao
+VEI-0001,ABC1D23,Volvo,FH 540,2019,Caminhão Truck,25000,28,150000,ativo,2023-05-10
+VEI-0002,ZZZ9999,Scania,R450,2020,Carreta LS,30000,30,80000,ativo,2023-01-15
+VEI-0003,DEF4G56,Mercedes-Benz,Actros,2021,Bitrem,40000,32,-500,inativo,2022-11-20
+VEI-0004,GHI7J89,Volvo,FH 460,1985,VUC,5000,10,60000,em_manutencao,2024-02-01
+VEI-0005,JKL0M12,Ford,Cargo,2018,Utilitário,8000,12,100000,desativado,2023-08-30
+VEI-0006,NOP3Q45,Iveco,Daily,2022,Caminhão Toco,12000,16,45000,ativo,
+VEI-0001,ABC1D23,Volvo,FH 540,2019,Caminhão Truck,25000,28,150000,ativo,2023-05-10
+,XYZ9W87,Volvo,FH,2020,Bitrem,35000,30,90000,ativo,2023-04-04
