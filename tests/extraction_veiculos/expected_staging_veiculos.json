@@ -1,0 +1,62 @@
+[
+  {
+    "veiculo_id": "VEI-0001",
+    "placa": "ABC1D23",
+    "km_atual": 150000,
+    "ano_fabricacao": 2019,
+    "status": "ativo",
+    "tipo": "Caminhão Truck",
+    "dq_observations": "",
+    "quality_ok": true
+  },
+  {
+    "veiculo_id": "VEI-0002",
+    "placa": null,
+    "km_atual": 80000,
+    "ano_fabricacao": 2020,
+    "status": "ativo",
+    "tipo": "Carreta LS",
+    "dq_observations": "invalid_plate",
+    "quality_ok": false
+  },
+  {
+    "veiculo_id": "VEI-0003",
+    "placa": "DEF4G56",
+    "km_atual": null,
+    "ano_fabricacao": 2021,
+    "status": "inativo",
+    "tipo": "Bitrem",
+    "dq_observations": "invalid_mileage",
+    "quality_ok": false
+  },
+  {
+    "veiculo_id": "VEI-0004",
+    "placa": "GHI7J89",
+    "km_atual": 60000,
+    "ano_fabricacao": null,
+    "status": "em_manutencao",
+    "tipo": "VUC",
+    "dq_observations": "invalid_year",
+    "quality_ok": false
+  },
+  {
+    "veiculo_id": "VEI-0005",
+    "placa": "JKL0M12",
+    "km_atual": 100000,
+    "ano_fabricacao": 2018,
+    "status": "desativado",
+    "tipo": "Utilitário",
+    "dq_observations": "invalid_status;invalid_type",
+    "quality_ok": false
+  },
+  {
+    "veiculo_id": "VEI-0006",
+    "placa": "NOP3Q45",
+    "km_atual": 45000,
+    "ano_fabricacao": 2022,
+    "status": "ativo",
+    "tipo": "Caminhão Toco",
+    "dq_observations": "missing_revision_date",
+    "quality_ok": false
+  }
+]
