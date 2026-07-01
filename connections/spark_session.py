@@ -1,11 +1,19 @@
-"""Factory for SparkSession instances used by the pipelines (local mode)."""
+"""Factory for local SparkSession instances used by the pipelines."""
 from __future__ import annotations
 
 from pyspark.sql import SparkSession
 
 
 def get_spark(app_name: str) -> SparkSession:
-    """Create (or reuse) a local SparkSession configured for small datasets."""
+    """Create or reuse a local SparkSession for small datasets.
+
+    Args:
+        app_name: Name shown for the Spark application in the UI
+            and logs.
+
+    Returns:
+        A SparkSession configured to run in local mode.
+    """
     return (
         SparkSession.builder.appName(app_name)
         .master("local[*]")
@@ -17,10 +25,20 @@ def get_spark(app_name: str) -> SparkSession:
 
 
 def run_spark(app_name: str, function, *args):
-    """Create a SparkSession, run ``function(spark, *args)`` and ensure shutdown.
+    """Create a SparkSession, run a function and ensure shutdown.
 
-    Returns whatever ``function`` returns, always stopping the session in the
-    ``finally`` block so a failing task doesn't leak the JVM process.
+    The session is always stopped in the ``finally`` block, even
+    when ``function`` raises, so a failing task doesn't leak the
+    JVM process.
+
+    Args:
+        app_name: Name passed to `get_spark` for the Spark
+            application.
+        function: Callable invoked as `function(spark, *args)`.
+        *args: Extra positional arguments forwarded to `function`.
+
+    Returns:
+        Whatever `function` returns.
     """
     spark = get_spark(app_name)
     try:
