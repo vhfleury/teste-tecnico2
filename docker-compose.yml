@@ -28,7 +28,8 @@ x-airflow-common:
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CORE__FERNET_KEY: ''
-    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    # DAGs nascem despausadas: ao subir o container, todas ficam ativas.
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
@@ -49,6 +50,10 @@ x-airflow-common:
     - ./parser:/opt/airflow/parser
     # Dados brutos do teste, disponíveis para as DAGs (somente leitura)
     - ./data:/opt/airflow/data:ro
+    # Testes unitários e de integração, executados dentro do container via pytest
+    - ./tests:/opt/airflow/tests
+    # Saída do pipeline (raw/staging/trusted), visível no host em ./lakehouse
+    - ./lakehouse:/opt/airflow/lakehouse
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -140,16 +145,19 @@ services:
 
   # Inicialização: cria pastas, migra o metadata DB e cria o usuário admin.
   # As variáveis _AIRFLOW_DB_MIGRATE e _AIRFLOW_WWW_USER_CREATE são lidas pelo
-  # entrypoint da imagem oficial.
+  # entrypoint da imagem oficial. Ao final, despausa todas as DAGs já
+  # registradas no metadata DB (DAGs novas já nascem despausadas via
+  # AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false).
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
     command:
       - -c
       - |
-        mkdir -p /opt/airflow/{logs,dags,plugins,config}
-        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins,config}
-        exec /entrypoint airflow version
+        mkdir -p /opt/airflow/{logs,dags,plugins,config,lakehouse}
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins,config,lakehouse}
+        /entrypoint airflow version
+        airflow dags unpause --treat-dag-id-as-regex -y ".*" || true
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'
