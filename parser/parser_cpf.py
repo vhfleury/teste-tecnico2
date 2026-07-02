@@ -4,7 +4,19 @@ from __future__ import annotations
 from pyspark.sql import Column
 from pyspark.sql import functions as F
 
-CPF_FORMAT_REGEX = r"^[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}$"
+CPF_DIGITS_REGEX = r"^[0-9]{11}$"
+
+
+def normalize_cpf(cpf: Column) -> Column:
+    """Strip the CPF punctuation, keeping only its digits.
+
+    Args:
+        cpf: Column with the CPF, formatted (`XXX.XXX.XXX-XX`) or not.
+
+    Returns:
+        String column with only the CPF digits (e.g. `52998224725`).
+    """
+    return F.regexp_replace(cpf, r"[^0-9]", "")
 
 
 def _cpf_check_digit(digits: Column, length: int) -> Column:
@@ -30,19 +42,22 @@ def _cpf_check_digit(digits: Column, length: int) -> Column:
 
 
 def cpf_is_valid(cpf: Column) -> Column:
-    """Validate a CPF: format, not all-same digits and check digits.
+    """Validate a CPF: 11 digits, not all-same digits and check digits.
+
+    The CPF is normalized first, so both the formatted
+    (`XXX.XXX.XXX-XX`) and the digits-only forms are accepted.
 
     Args:
-        cpf: Column with the CPF in `XXX.XXX.XXX-XX` format.
+        cpf: Column with the CPF, formatted or digits-only.
 
     Returns:
         Boolean column, False when the CPF is null, malformed or
         fails the check-digit rule.
     """
-    digits = F.regexp_replace(cpf, r"[^0-9]", "")
+    digits = normalize_cpf(cpf)
     return (
         cpf.isNotNull()
-        & cpf.rlike(CPF_FORMAT_REGEX)
+        & digits.rlike(CPF_DIGITS_REGEX)
         & (digits != F.repeat(F.substring(digits, 1, 1), 11))
         & (F.substring(digits, 10, 1).try_cast("int") == _cpf_check_digit(digits, 9))
         & (F.substring(digits, 11, 1).try_cast("int") == _cpf_check_digit(digits, 10))
