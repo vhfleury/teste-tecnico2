@@ -14,8 +14,10 @@ import logging
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
+from scripts.utils import raw_path, staging_path
+
 from . import statics
-from .extraction_veiculos_parser import clean_and_validate, raw_path, staging_path
+from .extraction_veiculos_parser import clean_and_validate
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +50,7 @@ def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
 
     total = df.count()
     log.info("CSV read: %d records, %d columns", total, len(df.columns))
-    destination = raw_path(ingest_date)
+    destination = raw_path(statics.RAW_DIR, ingest_date)
     log.info("Writing raw layer to %s", destination)
     df.coalesce(1).write.mode("overwrite").parquet(destination)
     log.info("Extraction finished - %d records written to raw", total)
@@ -70,7 +72,7 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
         input/output record counts and how many were flagged for
         quality.
     """
-    source = raw_path(ingest_date)
+    source = raw_path(statics.RAW_DIR, ingest_date)
     log.info("Starting transform - reading raw layer from %s", source)
     raw = spark.read.parquet(source)
     total_in = raw.count()
@@ -78,7 +80,7 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
 
     df = clean_and_validate(raw)
 
-    destination = staging_path(ingest_date)
+    destination = staging_path(statics.STAGING_DIR, ingest_date)
     log.info("Writing staging layer to %s", destination)
     df.coalesce(1).write.mode("overwrite").parquet(destination)
 

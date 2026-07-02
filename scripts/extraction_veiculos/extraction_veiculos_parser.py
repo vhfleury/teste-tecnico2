@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import datetime as dt
-import os
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
@@ -10,42 +9,6 @@ from pyspark.sql import functions as F
 from parser.quality import apply_quarantine, deduplicate_by_key, trim_columns
 
 from . import statics
-
-
-def raw_path(ingest_date: str) -> str:
-    """Build the partitioned raw path for a given ingestion date.
-
-    Args:
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The raw layer path for that partition.
-    """
-    return f"{statics.RAW_DIR}/ingest_date={ingest_date}"
-
-
-def staging_path(ingest_date: str) -> str:
-    """Build the partitioned staging path for a given ingestion date.
-
-    Args:
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The staging layer path for that partition.
-    """
-    return f"{statics.STAGING_DIR}/ingest_date={ingest_date}"
-
-
-def partition_processed(path: str) -> bool:
-    """Check whether a partition was already written successfully.
-
-    Args:
-        path: Path to the partition directory.
-
-    Returns:
-        True if a `_SUCCESS` marker exists under `path`.
-    """
-    return os.path.exists(os.path.join(path, "_SUCCESS"))
 
 
 def clean_and_validate(raw: DataFrame) -> DataFrame:
