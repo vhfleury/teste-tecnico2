@@ -28,14 +28,32 @@ def required(column: Column) -> Column:
     return column.isNotNull() & (column.cast("string") != "")
 
 
+def plate_is_valid(column: Column) -> Column:
+    """Validate a Brazilian license plate.
+
+    Accepts the old format (`ABC1234`) and the Mercosul format
+    (`ABC1D23`). The value is expected to be already trimmed and
+    uppercased by the treatments.
+
+    Args:
+        column: String column with the plate to check.
+
+    Returns:
+        Boolean column, True when the plate matches either format.
+    """
+    return column.rlike("^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$")
+
+
 # Checks a table config can declare on a column (`validations`). Each
 # check maps to a boolean column that is True when the value is valid;
 # `apply_table_validations` wraps it null-safely (null => invalid).
 VALIDATIONS = {
     "required": required,
+    "non_negative": lambda column: column >= 0,
     "cpf_is_valid": cpf_is_valid,
     "cnh_is_valid": cnh_is_valid,
     "cnh_category_is_valid": cnh_category_is_valid,
+    "plate_is_valid": plate_is_valid,
     "driver_status_is_valid": lambda column: column.isin(VALID_DRIVER_STATUS),
     "vehicle_status_is_valid": lambda column: column.isin(VALID_VEHICLE_STATUS),
     "vehicle_type_is_valid": lambda column: column.isin(VALID_VEHICLE_TYPES),
