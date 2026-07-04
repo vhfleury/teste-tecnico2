@@ -10,3 +10,9 @@ VALID_VEHICLE_TYPES = [
     "Carreta LS",
     "Bitrem",
 ]
+VALID_GEOFENCE_TYPES = [
+    "centro_distribuicao",
+    "pedagio",
+    "posto_combustivel",
+    "cliente",
+]
