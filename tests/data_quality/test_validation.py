@@ -213,6 +213,56 @@ def test_apply_table_validations_positive_flags_zero_negative_and_null(spark):
     ]
 
 
+def test_apply_table_validations_coordinates_in_brazil_check_nulls_pair(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "latitude",
+                "type": "double",
+                "validations": [
+                    {"check": "non_zero", "reason": "zeroed_latitude"},
+                    {
+                        "check": "coordinates_in_brazil",
+                        "reason": "coordinates_outside_brazil",
+                        "columns": ["latitude", "longitude"],
+                    },
+                ],
+            },
+            {
+                "name": "longitude",
+                "type": "double",
+                "validations": [{"check": "non_zero", "reason": "zeroed_longitude"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("POS-1", -23.55, -46.63),
+            ("POS-2", 40.7128, -74.0060),
+            ("POS-3", 0.0, 0.0),
+        ],
+        "posicao_id string, latitude double, longitude double",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    assert [
+        (
+            row["posicao_id"],
+            row["latitude"],
+            row["longitude"],
+            row["dq_observations"],
+            row["quality_ok"],
+        )
+        for row in result
+    ] == [
+        ("POS-1", -23.55, -46.63, "", True),
+        ("POS-2", None, None, "coordinates_outside_brazil", False),
+        ("POS-3", None, None, "zeroed_latitude;zeroed_longitude", False),
+    ]
+
+
 def test_apply_table_validations_geofence_type_check(spark):
     config = {
         "table_name": "staging_example",
@@ -332,6 +382,55 @@ def test_apply_table_validations_geojson_polygon_check(spark):
         ("GEO-0004", None, False),
         ("GEO-0005", None, False),
         ("GEO-0006", None, True),
+    ]
+
+
+def test_apply_table_validations_geojson_polygon_brazil_bounds_check(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "geometry",
+                "type": "string",
+                "validations": [
+                    {"check": "geojson_polygon_is_valid", "reason": "invalid_geometry"},
+                    {
+                        "check": "geojson_polygon_is_in_brazil",
+                        "reason": "geometry_outside_brazil",
+                    },
+                ],
+            },
+        ],
+    }
+    inside_brazil = (
+        '{"type":"Polygon","coordinates":[[[-46.65,-23.56],[-46.63,-23.56],'
+        '[-46.63,-23.54],[-46.65,-23.56]]]}'
+    )
+    outside_brazil = (
+        '{"type":"Polygon","coordinates":[[[-74.1,40.7],[-74.0,40.7],'
+        '[-74.0,40.8],[-74.1,40.7]]]}'
+    )
+    zeroed = '{"type":"Polygon","coordinates":[[[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0]]]}'
+    df = spark.createDataFrame(
+        [
+            ("GEO-0001", inside_brazil),
+            ("GEO-0002", outside_brazil),
+            ("GEO-0003", zeroed),
+            ("GEO-0004", "not a geojson"),
+        ],
+        "geocerca_id string, geometry string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    assert [
+        (row["geocerca_id"], row["geometry"], row["dq_observations"], row["quality_ok"])
+        for row in result
+    ] == [
+        ("GEO-0001", inside_brazil, "", True),
+        ("GEO-0002", None, "geometry_outside_brazil", False),
+        ("GEO-0003", None, "invalid_geometry", False),
+        ("GEO-0004", None, "invalid_geometry", False),
     ]
 
 

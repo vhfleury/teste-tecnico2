@@ -175,6 +175,22 @@
             "dq_observations": "",
             "quality_ok": true,
             "processed_at": null
+        },
+        {
+            "posicao_id": "POS-OUTSIDE-BR",
+            "viagem_id": "VIA-000003",
+            "veiculo_id": "VEI-0116",
+            "latitude": null,
+            "longitude": null,
+            "timestamp": "2026-04-28 22:09:58.588212",
+            "velocidade_kmh": 50,
+            "ignicao": true,
+            "odometro_metros": 100000.0,
+            "source_file": "/opt/airflow/data/rastreamento/posicoes.parquet",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "coordinates_outside_brazil",
+            "quality_ok": false,
+            "processed_at": null
         }
     ]
 }

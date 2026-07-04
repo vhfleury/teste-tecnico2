@@ -8,6 +8,10 @@ Value-changing logic lives in ``parser/treatment.py``.
 from __future__ import annotations
 
 from data_quality.statics import (
+    BRAZIL_LATITUDE_MAX,
+    BRAZIL_LATITUDE_MIN,
+    BRAZIL_LONGITUDE_MAX,
+    BRAZIL_LONGITUDE_MIN,
     MAX_SPEED_KMH,
     VALID_DRIVER_STATUS,
     VALID_GEOFENCE_TYPES,
@@ -50,6 +54,29 @@ def plate_is_valid(column: Column) -> Column:
     return column.rlike("^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$")
 
 
+def coordinates_are_in_brazil(latitude: Column, longitude: Column) -> Column:
+    """Validate a GPS coordinate pair against broad Brazil bounds.
+
+    The zeroed ``(0, 0)`` sentinel is intentionally left to the
+    dedicated ``non_zero`` checks so the reason remains precise.
+
+    Args:
+        latitude: Latitude column.
+        longitude: Longitude column.
+
+    Returns:
+        Boolean column, True when the coordinate pair falls inside
+        Brazil's broad bounding box, or when it is the zeroed sentinel
+        handled by the zero checks.
+    """
+    zeroed_coordinate = (latitude == 0.0) & (longitude == 0.0)
+    inside_brazil_bounds = (
+        latitude.between(BRAZIL_LATITUDE_MIN, BRAZIL_LATITUDE_MAX)
+        & longitude.between(BRAZIL_LONGITUDE_MIN, BRAZIL_LONGITUDE_MAX)
+    )
+    return zeroed_coordinate | inside_brazil_bounds
+
+
 # Spark SQL schema of a GeoJSON Polygon geometry, as serialized by the
 # staging canonicalization (numeric coordinates).
 GEOJSON_POLYGON_SCHEMA = "type string, coordinates array<array<array<double>>>"
@@ -85,6 +112,49 @@ def geojson_polygon_is_valid(column: Column) -> Column:
     return column.isNull() | valid
 
 
+def geojson_polygon_is_in_brazil(column: Column) -> Column:
+    """Validate that a GeoJSON Polygon's outer ring is inside Brazil bounds.
+
+    This check only owns the geographic-bounds concern. Null,
+    unparseable, non-Polygon, degenerate or zeroed geometries pass here
+    so `required` and `geojson_polygon_is_valid` can record the precise
+    structural reason.
+
+    Args:
+        column: String column holding the GeoJSON geometry.
+
+    Returns:
+        Boolean column, False when a structurally valid polygon has at
+        least one outer-ring point outside Brazil's broad bounding box.
+    """
+    geometry = F.from_json(column, GEOJSON_POLYGON_SCHEMA)
+    ring = geometry["coordinates"].getItem(0)
+    structurally_valid = F.coalesce(
+        (geometry["type"] == "Polygon")
+        & (F.size(geometry["coordinates"]) > 0)
+        & (F.size(ring) >= 4),
+        F.lit(False),
+    )
+    has_zeroed_point = F.coalesce(
+        F.exists(ring, lambda point: (point.getItem(0) == 0.0) & (point.getItem(1) == 0.0)),
+        F.lit(False),
+    )
+    valid_geometry = structurally_valid & ~has_zeroed_point
+    has_outside_point = F.coalesce(
+        F.exists(
+            ring,
+            lambda point: (
+                (point.getItem(1) < BRAZIL_LATITUDE_MIN)
+                | (point.getItem(1) > BRAZIL_LATITUDE_MAX)
+                | (point.getItem(0) < BRAZIL_LONGITUDE_MIN)
+                | (point.getItem(0) > BRAZIL_LONGITUDE_MAX)
+            ),
+        ),
+        F.lit(False),
+    )
+    return column.isNull() | ~valid_geometry | ~has_outside_point
+
+
 # Checks a table config can declare on a column (`validations`). Each
 # check maps to a boolean column that is True when the value is valid;
 # `apply_table_validations` wraps it null-safely (null => invalid).
@@ -94,6 +164,7 @@ VALIDATIONS = {
     "positive": lambda column: column > 0,
     "non_zero": lambda column: column != 0,
     "speed_within_limit": lambda column: column <= MAX_SPEED_KMH,
+    "coordinates_in_brazil": coordinates_are_in_brazil,
     "cpf_is_valid": cpf_is_valid,
     "cnh_is_valid": cnh_is_valid,
     "cnh_category_is_valid": cnh_category_is_valid,
@@ -104,6 +175,7 @@ VALIDATIONS = {
     "geofence_type_is_valid": lambda column: column.isin(VALID_GEOFENCE_TYPES),
     "trip_status_is_valid": lambda column: column.isin(VALID_TRIP_STATUS),
     "geojson_polygon_is_valid": geojson_polygon_is_valid,
+    "geojson_polygon_is_in_brazil": geojson_polygon_is_in_brazil,
 }
 
 
@@ -172,9 +244,21 @@ def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
                     f"Unknown validation '{check}' for column '{name}' "
                     f"in table config '{table}'"
                 )
-            condition = F.coalesce(VALIDATIONS[check](F.col(name)), F.lit(False))
+            validation_columns = validation.get("columns", [name])
+            missing_columns = [column for column in validation_columns if column not in df.columns]
+            if missing_columns:
+                raise ValueError(
+                    f"Validation '{check}' for column '{name}' references missing "
+                    f"column(s) in table config '{table}': {', '.join(missing_columns)}"
+                )
+            condition = F.coalesce(
+                VALIDATIONS[check](*[F.col(column) for column in validation_columns]),
+                F.lit(False),
+            )
             checks[reason] = condition
-            column_conditions.setdefault(name, []).append(condition)
+            for column_name in validation.get("null_columns", validation_columns):
+                if column_name in df.columns:
+                    column_conditions.setdefault(column_name, []).append(condition)
 
     df = apply_quarantine(df, checks)
 

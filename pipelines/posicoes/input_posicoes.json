@@ -144,6 +144,19 @@
             "ingested_at": "2026-07-04 12:00:00.000000"
         },
         {
+            "posicao_id": "POS-OUTSIDE-BR",
+            "viagem_id": "VIA-000003",
+            "veiculo_id": "VEI-0116",
+            "latitude": "40.7128",
+            "longitude": "-74.0060",
+            "timestamp": "2026-04-28 22:09:58.588212",
+            "velocidade_kmh": "50",
+            "ignicao": "true",
+            "odometro_metros": "100000.0",
+            "source_file": "/opt/airflow/data/rastreamento/posicoes.parquet",
+            "ingested_at": "2026-07-04 12:00:00.000000"
+        },
+        {
             "posicao_id": "POS-367FE6FF0F",
             "viagem_id": "VIA-000003",
             "veiculo_id": "VEI-0116",
