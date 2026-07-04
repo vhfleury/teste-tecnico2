@@ -55,7 +55,8 @@
             "type": "string",
             "validations": [
                 {"check": "required", "reason": "missing_geometry"},
-                {"check": "geojson_polygon_is_valid", "reason": "invalid_geometry"}
+                {"check": "geojson_polygon_is_valid", "reason": "invalid_geometry"},
+                {"check": "geojson_polygon_is_in_brazil", "reason": "geometry_outside_brazil"}
             ],
             "example": "{\"type\":\"Polygon\",\"coordinates\":[[[-46.4731,-23.426617],[-46.47119,-23.426789]]]}"
         },
