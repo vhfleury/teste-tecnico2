@@ -1,0 +1,124 @@
+{
+    "table_name": "staging_motoristas",
+    "description": "Driver registry cleaned and validated (staging layer)",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "motorista_id",
+            "type": "string",
+            "key": true,
+            "treatments": ["trim", "normalize"],
+            "example": "MOT-0002"
+        },
+        {
+            "name": "nome",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "validations": [
+                {"check": "required", "reason": "missing_name"}
+            ],
+            "example": "NICOLAS SOUSA"
+        },
+        {
+            "name": "cpf",
+            "type": "string",
+            "treatments": ["trim"],
+            "validations": [
+                {"check": "cpf_is_valid", "reason": "invalid_cpf"}
+            ],
+            "example": "795.426.108-58"
+        },
+        {
+            "name": "cpf",
+            "type": "string",
+            "treatments": ["normalize_cpf"],
+            "new_name": "cpf_normalize",
+            "example": "79542610858"
+        },
+        {
+            "name": "cnh",
+            "type": "string",
+            "treatments": ["trim"],
+            "validations": [
+                {"check": "cnh_is_valid", "reason": "invalid_cnh"}
+            ],
+            "example": "95800408566"
+        },
+        {
+            "name": "categoria_cnh",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "validations": [
+                {"check": "cnh_category_is_valid", "reason": "invalid_cnh_category"}
+            ],
+            "example": "E"
+        },
+        {
+            "name": "validade_cnh",
+            "type": "date",
+            "validations": [
+                {"check": "required", "reason": "missing_cnh_expiry"}
+            ],
+            "example": "2027-10-10"
+        },
+        {
+            "name": "telefone",
+            "type": "string",
+            "treatments": ["trim", "normalize_telefone"],
+            "example": "8163427352"
+        },
+        {
+            "name": "data_admissao",
+            "type": "date",
+            "validations": [
+                {"check": "required", "reason": "missing_admission_date"}
+            ],
+            "example": "2023-11-03"
+        },
+        {
+            "name": "base_operacional",
+            "type": "string",
+            "treatments": ["trim"],
+            "example": "CD Recife - Jaboatão"
+        },
+        {
+            "name": "status",
+            "type": "string",
+            "treatments": ["trim", "lowercase"],
+            "validations": [
+                {"check": "driver_status_is_valid", "reason": "invalid_status"}
+            ],
+            "example": "ativo"
+        },
+        {
+            "name": "source_file",
+            "type": "string",
+            "example": "/opt/airflow/data/motoristas/motoristas.json"
+        },
+        {
+            "name": "ingested_at",
+            "type": "timestamp",
+            "example": "2026-07-02 12:44:15.126810"
+        },
+        {
+            "name": "dq_observations",
+            "type": "string",
+            "example": "invalid_cpf;missing_admission_date"
+        },
+        {
+            "name": "quality_ok",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-02 12:59:38.294138"
+        },
+        {
+            "name": "ingest_date",
+            "type": "date",
+            "example": "2026-07-02"
+        }
+    ]
+}
