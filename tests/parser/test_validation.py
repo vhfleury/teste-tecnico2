@@ -1,7 +1,7 @@
 """Unit tests for the shared validation helpers."""
 import pytest
 
-from parser.validation import enforce_table_config
+from data_quality.validation import enforce_table_config
 
 TABLE_CONFIG = {
     "table_name": "staging_example",
