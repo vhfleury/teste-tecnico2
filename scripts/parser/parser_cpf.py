@@ -35,7 +35,7 @@ def _cpf_check_digit(digits: Column, length: int) -> Column:
         Column with the expected check digit.
     """
     weighted = sum(
-        F.substring(digits, position + 1, 1).try_cast("int") * (length + 1 - position)
+        F.substring(digits, position + 1, 1).cast("int") * (length + 1 - position)
         for position in range(length)
     )
     return ((weighted * 10) % 11) % 10
@@ -59,6 +59,6 @@ def cpf_is_valid(cpf: Column) -> Column:
         cpf.isNotNull()
         & digits.rlike(CPF_DIGITS_REGEX)
         & (digits != F.repeat(F.substring(digits, 1, 1), 11))
-        & (F.substring(digits, 10, 1).try_cast("int") == _cpf_check_digit(digits, 9))
-        & (F.substring(digits, 11, 1).try_cast("int") == _cpf_check_digit(digits, 10))
+        & (F.substring(digits, 10, 1).cast("int") == _cpf_check_digit(digits, 9))
+        & (F.substring(digits, 11, 1).cast("int") == _cpf_check_digit(digits, 10))
     )
