@@ -1,5 +1,7 @@
 """Unit tests for the shared path and config helpers."""
 import json
+from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,6 +11,7 @@ from general.utils import (
     partition_processed,
     raw_dir,
     raw_path,
+    resolve_ingest_date,
     staging_dir,
     staging_path,
 )
@@ -38,6 +41,21 @@ def test_staging_path_builds_partition_for_ingest_date():
         staging_path("/lakehouse/staging/motoristas", "2024-01-01")
         == "/lakehouse/staging/motoristas/ingest_date=2024-01-01"
     )
+
+
+def test_resolve_ingest_date_uses_ds_when_present():
+    context = {"ds": "2024-01-01"}
+
+    assert resolve_ingest_date(context) == "2024-01-01"
+
+
+def test_resolve_ingest_date_falls_back_to_run_after():
+    context = {
+        "ds": None,
+        "dag_run": SimpleNamespace(run_after=datetime(2024, 2, 3, 15, 30)),
+    }
+
+    assert resolve_ingest_date(context) == "2024-02-03"
 
 
 def test_partition_processed_requires_success_marker(tmp_path):
