@@ -250,6 +250,46 @@ def test_apply_table_validations_geofence_type_check(spark):
     ]
 
 
+def test_apply_table_validations_trip_status_check(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "status",
+                "type": "string",
+                "validations": [
+                    {"check": "trip_status_is_valid", "reason": "invalid_status"}
+                ],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("VIA-000001", "em_transito"),
+            ("VIA-000002", "concluida"),
+            ("VIA-000003", "cancelada"),
+            ("VIA-000004", "atrasada"),
+            ("VIA-000005", "planejada"),
+            ("VIA-000006", None),
+        ],
+        "viagem_id string, status string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # The four known statuses pass; unknown or null statuses are flagged.
+    assert [
+        (row["viagem_id"], row["status"], row["quality_ok"]) for row in result
+    ] == [
+        ("VIA-000001", "em_transito", True),
+        ("VIA-000002", "concluida", True),
+        ("VIA-000003", "cancelada", True),
+        ("VIA-000004", "atrasada", True),
+        ("VIA-000005", None, False),
+        ("VIA-000006", None, False),
+    ]
+
+
 def test_apply_table_validations_geojson_polygon_check(spark):
     config = {
         "table_name": "staging_example",
