@@ -79,7 +79,7 @@ STAGING_MOTORISTAS = Asset("staging_motoristas")
 @dag(
     dag_id="motoristas",
     description="Driver registry ingestion and standardization (JSON -> raw -> staging)",
-    schedule=None,
+    schedule="*/10 * * * *",
     start_date=pendulum.datetime(2024, 1, 1, tz="UTC"),
     catchup=False,
     max_active_runs=1,
