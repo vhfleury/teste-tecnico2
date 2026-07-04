@@ -17,3 +17,6 @@ VALID_GEOFENCE_TYPES = [
     "cliente",
 ]
 VALID_TRIP_STATUS = ["em_transito", "concluida", "cancelada", "atrasada"]
+# Physically plausible ceiling for truck telemetry, in km/h. Values above
+# it are device sentinels/glitches (the source uses 999), not real speed.
+MAX_SPEED_KMH = 150

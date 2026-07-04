@@ -8,6 +8,7 @@ Value-changing logic lives in ``parser/treatment.py``.
 from __future__ import annotations
 
 from data_quality.statics import (
+    MAX_SPEED_KMH,
     VALID_DRIVER_STATUS,
     VALID_GEOFENCE_TYPES,
     VALID_TRIP_STATUS,
@@ -91,6 +92,8 @@ VALIDATIONS = {
     "required": required,
     "non_negative": lambda column: column >= 0,
     "positive": lambda column: column > 0,
+    "non_zero": lambda column: column != 0,
+    "speed_within_limit": lambda column: column <= MAX_SPEED_KMH,
     "cpf_is_valid": cpf_is_valid,
     "cnh_is_valid": cnh_is_valid,
     "cnh_category_is_valid": cnh_category_is_valid,
