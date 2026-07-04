@@ -14,7 +14,6 @@ import os
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-
 from scripts.utils import DATA_DIR, raw_dir, raw_path, staging_dir, staging_path
 
 from .extraction_veiculos_parser import clean_and_validate

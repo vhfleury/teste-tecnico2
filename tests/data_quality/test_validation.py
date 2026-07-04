@@ -1,12 +1,11 @@
 """Unit tests for the shared validation helpers."""
 import pytest
-from pyspark.sql import functions as F
-
 from data_quality.validation import (
     apply_quarantine,
     apply_table_validations,
     enforce_table_config,
 )
+from pyspark.sql import functions as F
 
 TABLE_CONFIG = {
     "table_name": "staging_example",

@@ -3,15 +3,14 @@ from __future__ import annotations
 
 import datetime as dt
 
-from pyspark.sql import DataFrame
-from pyspark.sql import functions as F
-
 from parser.treatment import deduplicate_by_key, trim_columns
 from parser.validation import (
     VALID_VEHICLE_STATUS,
     VALID_VEHICLE_TYPES,
     apply_quarantine,
 )
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 
 PLATE_MERCOSUL_REGEX = r"^[A-Z]{3}[0-9][A-Z][0-9]{2}$"
 MIN_MANUFACTURE_YEAR = 1990

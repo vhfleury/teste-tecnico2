@@ -10,11 +10,10 @@ that flag or abort instead of changing values live in
 """
 from __future__ import annotations
 
-from pyspark.sql import Column, DataFrame
-from pyspark.sql import functions as F
-
 from parser.parser_cpf import normalize_cpf
 from parser.parser_telefone import normalize_telefone
+from pyspark.sql import Column, DataFrame
+from pyspark.sql import functions as F
 
 
 def normalize(column: Column) -> Column:

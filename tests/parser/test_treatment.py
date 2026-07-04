@@ -2,7 +2,6 @@
 import datetime
 
 import pytest
-
 from parser.treatment import (
     apply_derived_columns,
     apply_table_treatments,

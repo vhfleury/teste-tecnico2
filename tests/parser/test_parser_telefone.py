@@ -1,12 +1,11 @@
 """Unit tests for the shared phone validation helpers."""
-from pyspark.sql import functions as F
-
 from parser.parser_telefone import (
     ddd_from_telefone,
     ddd_to_uf,
     normalize_telefone,
     telefone_is_valid,
 )
+from pyspark.sql import functions as F
 
 
 def test_normalize_telefone_strips_country_code_and_trunk_zero(spark):

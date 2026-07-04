@@ -7,12 +7,11 @@ Value-changing logic lives in ``parser/treatment.py``.
 """
 from __future__ import annotations
 
-from pyspark.sql import Column, DataFrame
-from pyspark.sql import functions as F
-
 from data_quality.statics import VALID_DRIVER_STATUS, VALID_VEHICLE_STATUS, VALID_VEHICLE_TYPES
 from parser.parser_cnh import cnh_category_is_valid, cnh_is_valid
 from parser.parser_cpf import cpf_is_valid
+from pyspark.sql import Column, DataFrame
+from pyspark.sql import functions as F
 
 
 def required(column: Column) -> Column:

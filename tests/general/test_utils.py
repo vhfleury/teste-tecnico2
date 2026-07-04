@@ -4,7 +4,6 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
-
 from general import utils
 from general.utils import (
     load_table_config,

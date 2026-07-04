@@ -1,7 +1,6 @@
 """Unit tests for the shared CNH validation helpers."""
-from pyspark.sql import functions as F
-
 from parser.parser_cnh import cnh_category_is_valid, cnh_is_valid
+from pyspark.sql import functions as F
 
 
 def test_cnh_is_valid_requires_eleven_digits(spark):
