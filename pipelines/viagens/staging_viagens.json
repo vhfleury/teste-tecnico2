@@ -1,0 +1,115 @@
+{
+    "table_name": "staging_viagens",
+    "description": "Trips fact cleaned and validated (staging layer)",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "viagem_id",
+            "type": "string",
+            "key": true,
+            "treatments": ["trim", "normalize"],
+            "example": "VIA-000001"
+        },
+        {
+            "name": "veiculo_id",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "example": "VEI-0062"
+        },
+        {
+            "name": "motorista_id",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "example": "MOT-0054"
+        },
+        {
+            "name": "geocerca_origem_id",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "example": "GEO-0005"
+        },
+        {
+            "name": "geocerca_destino_id",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "example": "GEO-0027"
+        },
+        {
+            "name": "data_inicio",
+            "type": "timestamp",
+            "validations": [
+                {"check": "required", "reason": "missing_start_date"}
+            ],
+            "example": "2026-04-28 21:34:51.499012"
+        },
+        {
+            "name": "data_fim_prevista",
+            "type": "timestamp",
+            "example": "2026-04-29 15:34:51.499012"
+        },
+        {
+            "name": "data_fim_real",
+            "type": "timestamp",
+            "example": "2026-05-01 00:36:13.170904"
+        },
+        {
+            "name": "status",
+            "type": "string",
+            "treatments": ["trim", "lowercase"],
+            "validations": [
+                {"check": "trip_status_is_valid", "reason": "invalid_status"}
+            ],
+            "example": ["concluida", "em_transito", "cancelada", "atrasada"]
+        },
+        {
+            "name": "distancia_km",
+            "type": "int",
+            "validations": [
+                {"check": "positive", "reason": "invalid_distance"}
+            ],
+            "example": 697
+        },
+        {
+            "name": "peso_carga_kg",
+            "type": "int",
+            "validations": [
+                {"check": "positive", "reason": "invalid_cargo_weight"}
+            ],
+            "example": 29358
+        },
+        {
+            "name": "nota_fiscal",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "validations": [
+                {"check": "required", "reason": "missing_invoice"}
+            ],
+            "example": "NF-577810"
+        },
+        {
+            "name": "source_file",
+            "type": "string",
+            "example": "/opt/airflow/data/viagens/viagens.csv"
+        },
+        {
+            "name": "ingested_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:00:00.000000"
+        },
+        {
+            "name": "dq_observations",
+            "type": "string",
+            "example": "missing_start_date;invalid_distance"
+        },
+        {
+            "name": "quality_ok",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00.000000"
+        }
+    ]
+}
