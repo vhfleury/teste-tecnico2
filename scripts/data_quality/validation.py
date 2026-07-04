@@ -7,7 +7,12 @@ Value-changing logic lives in ``parser/treatment.py``.
 """
 from __future__ import annotations
 
-from data_quality.statics import VALID_DRIVER_STATUS, VALID_VEHICLE_STATUS, VALID_VEHICLE_TYPES
+from data_quality.statics import (
+    VALID_DRIVER_STATUS,
+    VALID_GEOFENCE_TYPES,
+    VALID_VEHICLE_STATUS,
+    VALID_VEHICLE_TYPES,
+)
 from parser.parser_cnh import cnh_category_is_valid, cnh_is_valid
 from parser.parser_cpf import cpf_is_valid
 from pyspark.sql import Column, DataFrame
@@ -43,12 +48,48 @@ def plate_is_valid(column: Column) -> Column:
     return column.rlike("^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$")
 
 
+# Spark SQL schema of a GeoJSON Polygon geometry, as serialized by the
+# staging canonicalization (numeric coordinates).
+GEOJSON_POLYGON_SCHEMA = "type string, coordinates array<array<array<double>>>"
+
+
+def geojson_polygon_is_valid(column: Column) -> Column:
+    """Validate a GeoJSON Polygon serialized as a JSON string.
+
+    Structural check on the outer ring: the value must parse as a
+    ``Polygon`` whose ring has at least 4 points and contains no
+    zeroed ``(0, 0)`` coordinate (the "null island" defect). A null
+    geometry passes, so presence can be flagged separately by
+    ``required`` under its own reason.
+
+    Args:
+        column: String column holding the GeoJSON geometry.
+
+    Returns:
+        Boolean column, True when the geometry is null or
+        structurally valid.
+    """
+    geometry = F.from_json(column, GEOJSON_POLYGON_SCHEMA)
+    ring = geometry["coordinates"].getItem(0)
+    has_zeroed_point = F.exists(
+        ring, lambda point: (point.getItem(0) == 0.0) & (point.getItem(1) == 0.0)
+    )
+    valid = (
+        (geometry["type"] == "Polygon")
+        & (F.size(geometry["coordinates"]) > 0)
+        & (F.size(ring) >= 4)
+        & ~has_zeroed_point
+    )
+    return column.isNull() | valid
+
+
 # Checks a table config can declare on a column (`validations`). Each
 # check maps to a boolean column that is True when the value is valid;
 # `apply_table_validations` wraps it null-safely (null => invalid).
 VALIDATIONS = {
     "required": required,
     "non_negative": lambda column: column >= 0,
+    "positive": lambda column: column > 0,
     "cpf_is_valid": cpf_is_valid,
     "cnh_is_valid": cnh_is_valid,
     "cnh_category_is_valid": cnh_category_is_valid,
@@ -56,6 +97,8 @@ VALIDATIONS = {
     "driver_status_is_valid": lambda column: column.isin(VALID_DRIVER_STATUS),
     "vehicle_status_is_valid": lambda column: column.isin(VALID_VEHICLE_STATUS),
     "vehicle_type_is_valid": lambda column: column.isin(VALID_VEHICLE_TYPES),
+    "geofence_type_is_valid": lambda column: column.isin(VALID_GEOFENCE_TYPES),
+    "geojson_polygon_is_valid": geojson_polygon_is_valid,
 }
 
 
