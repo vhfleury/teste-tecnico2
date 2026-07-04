@@ -1,0 +1,188 @@
+"""Unit tests for the shared validation helpers."""
+import pytest
+from pyspark.sql import functions as F
+
+from data_quality.validation import (
+    apply_quarantine,
+    apply_table_validations,
+    enforce_table_config,
+)
+
+TABLE_CONFIG = {
+    "table_name": "staging_example",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {"name": "id", "type": "string", "example": "ID-1"},
+        {"name": "amount", "type": "bigint", "example": 10},
+        {"name": "ingest_date", "type": "date", "example": "2024-01-01"},
+    ],
+}
+
+
+def test_enforce_table_config_orders_and_drops_undeclared_columns(spark):
+    df = spark.createDataFrame([(10, "ID-1", "extra")], ["amount", "id", "undeclared"])
+
+    result = enforce_table_config(df, TABLE_CONFIG)
+
+    # Partition column is not required; declared columns come in config order.
+    assert result.columns == ["id", "amount"]
+
+
+def test_enforce_table_config_fails_on_missing_column(spark):
+    df = spark.createDataFrame([("ID-1",)], ["id"])
+
+    with pytest.raises(ValueError, match="missing columns: amount"):
+        enforce_table_config(df, TABLE_CONFIG)
+
+
+def test_enforce_table_config_fails_on_type_mismatch(spark):
+    df = spark.createDataFrame([("ID-1", "10")], ["id", "amount"])
+
+    with pytest.raises(ValueError, match="amount \\(expected bigint, got string\\)"):
+        enforce_table_config(df, TABLE_CONFIG)
+
+
+def test_enforce_table_config_expects_renamed_column(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {"name": "cpf", "type": "string"},
+            {
+                "name": "cpf",
+                "type": "string",
+                "treatment": "normalize_cpf",
+                "new_name": "cpf_normalize",
+            },
+        ],
+    }
+    df = spark.createDataFrame([("111.111.111-11", "11111111111")], ["cpf", "cpf_normalize"])
+
+    result = enforce_table_config(df, config)
+
+    assert result.columns == ["cpf", "cpf_normalize"]
+
+
+def test_apply_table_validations_flags_and_nulls_declared_reasons(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {"name": "motorista_id", "type": "string"},
+            {
+                "name": "nome",
+                "type": "string",
+                "validations": [{"check": "required", "reason": "missing_name"}],
+            },
+            {
+                "name": "cpf",
+                "type": "string",
+                "validations": [{"check": "cpf_is_valid", "reason": "invalid_cpf"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("MOT-0001", "ANA SOUZA", "529.982.247-25"),
+            ("MOT-0002", "", "111.111.111-11"),
+        ],
+        ["motorista_id", "nome", "cpf"],
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # Row 2 keeps its key, both failing values are nulled, reasons recorded.
+    assert [
+        (row["motorista_id"], row["nome"], row["cpf"], row["dq_observations"], row["quality_ok"])
+        for row in result
+    ] == [
+        ("MOT-0001", "ANA SOUZA", "529.982.247-25", "", True),
+        ("MOT-0002", None, None, "missing_name;invalid_cpf", False),
+    ]
+
+
+def test_apply_table_validations_treats_null_check_result_as_invalid(spark):
+    # A null boolean (e.g. isin over a null value) counts as invalid here,
+    # unlike raw apply_quarantine - the engine closes that loophole.
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "status",
+                "type": "string",
+                "validations": [{"check": "driver_status_is_valid", "reason": "invalid_status"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame([("MOT-0001", None)], "motorista_id string, status string")
+
+    result = apply_table_validations(df, config).collect()
+
+    assert [(row["dq_observations"], row["quality_ok"]) for row in result] == [
+        ("invalid_status", False)
+    ]
+
+
+def test_apply_table_validations_fails_on_unknown_check(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "nome",
+                "type": "string",
+                "validations": [{"check": "does_not_exist", "reason": "missing_name"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame([("Ana Souza",)], ["nome"])
+
+    with pytest.raises(ValueError, match="Unknown validation 'does_not_exist'"):
+        apply_table_validations(df, config)
+
+
+def test_apply_quarantine_flags_failing_rows_without_dropping_them(spark):
+    df = spark.createDataFrame(
+        [
+            ("MOT-0001", "ANA SOUZA", "ativo"),
+            ("MOT-0002", None, "ativo"),
+            ("MOT-0003", None, "desconhecido"),
+        ],
+        ["motorista_id", "nome", "status"],
+    )
+    checks = {
+        "missing_name": F.col("nome").isNotNull(),
+        "invalid_status": F.col("status").isin(["ativo", "ferias"]),
+    }
+
+    result = apply_quarantine(df, checks).collect()
+
+    # Every row survives; reasons accumulate in declaration order, ";"-separated.
+    assert [
+        (row["motorista_id"], row["dq_observations"], row["quality_ok"]) for row in result
+    ] == [
+        ("MOT-0001", "", True),
+        ("MOT-0002", "missing_name", False),
+        ("MOT-0003", "missing_name;invalid_status", False),
+    ]
+
+
+def test_apply_quarantine_null_check_result_passes_silently(spark):
+    # Contract: checks must be null-safe (e.g. include isNotNull), because a
+    # null boolean is neither True nor False and records no observation.
+    df = spark.createDataFrame([("MOT-0001", None)], "motorista_id string, status string")
+    checks = {"invalid_status": F.col("status").isin(["ativo"])}
+
+    result = apply_quarantine(df, checks).collect()
+
+    assert [(row["dq_observations"], row["quality_ok"]) for row in result] == [("", True)]
+
+
+def test_apply_quarantine_keeps_existing_columns_intact(spark):
+    df = spark.createDataFrame([("MOT-0001", "529.982.247-25")], ["motorista_id", "cpf"])
+    checks = {"invalid_cpf": F.lit(False)}
+
+    result = apply_quarantine(df, checks).collect()
+
+    # Flagging never mutates the offending value - that decision belongs
+    # to the pipeline (quarantine nulls it out explicitly when needed).
+    assert [(row["motorista_id"], row["cpf"], row["quality_ok"]) for row in result] == [
+        ("MOT-0001", "529.982.247-25", False)
+    ]
