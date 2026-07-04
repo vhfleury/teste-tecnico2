@@ -104,6 +104,11 @@
             "name": "quality_ok",
             "type": "boolean",
             "example": true
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-02 12:59:38.294138"
         }
     ]
 }
