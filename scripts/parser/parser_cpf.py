@@ -4,7 +4,7 @@ from __future__ import annotations
 from pyspark.sql import Column
 from pyspark.sql import functions as F
 
-CPF_DIGITS_REGEX = r"^[0-9]{11}$"
+from parser.statics import CPF_DIGITS_REGEX
 
 
 def normalize_cpf(cpf: Column) -> Column:
