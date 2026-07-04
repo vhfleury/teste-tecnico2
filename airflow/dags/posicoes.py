@@ -63,7 +63,7 @@ STAGING_POSICOES = Asset("staging_posicoes")
 
 @dag(
     dag_id="posicoes",
-    description="Vehicle tracking positions ingestion and standardization (Parquet -> raw -> staging)",
+    description="Vehicle tracking positions ingestion and standardization",
     schedule="*/10 * * * *",
     start_date=pendulum.datetime(2024, 1, 1, tz="UTC"),
     catchup=False,
