@@ -9,6 +9,18 @@ from __future__ import annotations
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
+# Registry status/type domains (docs/dados.md).
+VALID_DRIVER_STATUS = ["ativo", "ferias", "afastado", "desligado"]
+VALID_VEHICLE_STATUS = ["ativo", "em_manutencao", "inativo"]
+VALID_VEHICLE_TYPES = [
+    "VUC",
+    "Caminhão Toco",
+    "Caminhão Truck",
+    "Carreta Simples",
+    "Carreta LS",
+    "Bitrem",
+]
+
 
 def apply_quarantine(df: DataFrame, checks: dict[str, Column]) -> DataFrame:
     """Flag rows that fail data-quality checks without dropping them.
