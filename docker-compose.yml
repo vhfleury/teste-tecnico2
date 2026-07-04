@@ -146,9 +146,9 @@ services:
 
   # Inicialização: cria pastas, migra o metadata DB e cria o usuário admin.
   # As variáveis _AIRFLOW_DB_MIGRATE e _AIRFLOW_WWW_USER_CREATE são lidas pelo
-  # entrypoint da imagem oficial. Ao final, despausa todas as DAGs já
-  # registradas no metadata DB (DAGs novas já nascem despausadas via
-  # AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=false).
+  # entrypoint da imagem oficial. (Comandos `airflow ...` diretos NÃO funcionam
+  # aqui: o init roda como root e o pacote está no site-packages do usuário
+  # airflow - por isso o disparo das DAGs vive no serviço airflow-trigger-dags.)
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
@@ -158,7 +158,29 @@ services:
         mkdir -p /opt/airflow/{logs,dags,plugins,config,lakehouse}
         chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins,config,lakehouse}
         /entrypoint airflow version
-        airflow dags unpause --treat-dag-id-as-regex -y ".*" || true
+
+  # One-shot pós-init: serializa as DAGs no metadata DB (necessário em banco
+  # recém-criado), despausa todas e DISPARA uma run de cada uma - subir o
+  # stack já executa o pipeline. Re-subir no mesmo dia é inofensivo: as
+  # tasks skipam ao encontrar o _SUCCESS da partição do dia. Roda como
+  # usuário airflow (não root), onde a CLI funciona.
+  airflow-trigger-dags:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        # `python -m airflow` (e nao o script `airflow`): o console script
+        # depende do sys.path do usuario efetivo e quebra fora do uid airflow.
+        python -m airflow dags reserialize || true
+        python -m airflow dags unpause --treat-dag-id-as-regex -y ".*" || true
+        for dag_id in $$(python -m airflow dags list --output plain 2>/dev/null | awk 'NR>1 {print $$1}' | sort -u); do
+          python -m airflow dags trigger "$$dag_id" || true
+        done
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'
