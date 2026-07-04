@@ -37,8 +37,9 @@ x-airflow-common:
     # com Spark, prefira construir uma imagem própria (Dockerfile / build acima).
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
-    # Torna `connections`, `scripts` e `parser` importáveis pelas DAGs.
-    PYTHONPATH: '/opt/airflow'
+    # Torna os pacotes importáveis pelas DAGs: scripts/ (parser, data_quality,
+    # general), pipelines/ (motoristas, ...) e a raiz (connections).
+    PYTHONPATH: '/opt/airflow/scripts:/opt/airflow/pipelines:/opt/airflow'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-./airflow}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-./airflow}/logs:/opt/airflow/logs
@@ -47,7 +48,7 @@ x-airflow-common:
     # Pacotes de código compartilhados pelas pipelines.
     - ./connections:/opt/airflow/connections
     - ./scripts:/opt/airflow/scripts
-    - ./parser:/opt/airflow/parser
+    - ./pipelines:/opt/airflow/pipelines
     # Dados brutos do teste, disponíveis para as DAGs (somente leitura)
     - ./data:/opt/airflow/data:ro
     # Testes unitários e de integração, executados dentro do container via pytest
