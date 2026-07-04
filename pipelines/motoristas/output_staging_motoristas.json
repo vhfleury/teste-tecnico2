@@ -11,10 +11,11 @@
             "telefone": "7128271996",
             "data_admissao": "2022-01-15",
             "base_operacional": "CD Goiânia - Aparecida",
-            "status": "ativo",
+            "status": "ATIVO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "missing_name",
-            "quality_ok": false
+            "quality_ok": false,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0002",
@@ -27,10 +28,11 @@
             "telefone": "8108785042",
             "data_admissao": "2023-11-03",
             "base_operacional": "CD Recife - Jaboatão",
-            "status": "ativo",
+            "status": "ATIVO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "",
-            "quality_ok": true
+            "quality_ok": true,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0003",
@@ -43,10 +45,11 @@
             "telefone": "3193734768",
             "data_admissao": "2026-01-10",
             "base_operacional": "CD Belo Horizonte - Contagem",
-            "status": "afastado",
+            "status": "AFASTADO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "",
-            "quality_ok": true
+            "quality_ok": true,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0004",
@@ -59,10 +62,11 @@
             "telefone": "8109732214",
             "data_admissao": "2021-07-05",
             "base_operacional": "CD Curitiba - CIC",
-            "status": "desligado",
+            "status": "DESLIGADO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "",
-            "quality_ok": true
+            "quality_ok": true,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0005",
@@ -75,10 +79,11 @@
             "telefone": null,
             "data_admissao": "2019-06-11",
             "base_operacional": "CD Goiânia - Aparecida",
-            "status": "ativo",
+            "status": "ATIVO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "",
-            "quality_ok": true
+            "quality_ok": true,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0006",
@@ -91,10 +96,11 @@
             "telefone": "8104564018",
             "data_admissao": "2024-12-28",
             "base_operacional": "CD Rio de Janeiro - Duque de Caxias",
-            "status": "ativo",
+            "status": "ATIVO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "invalid_cnh",
-            "quality_ok": false
+            "quality_ok": false,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0023",
@@ -107,10 +113,11 @@
             "telefone": "2169667516",
             "data_admissao": "2020-01-13",
             "base_operacional": "CD São Paulo - Guarulhos",
-            "status": "ferias",
+            "status": "FERIAS",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "",
-            "quality_ok": true
+            "quality_ok": true,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0042",
@@ -123,10 +130,11 @@
             "telefone": "8172945176",
             "data_admissao": "2022-12-27",
             "base_operacional": "CD Belo Horizonte - Contagem",
-            "status": "ativo",
+            "status": "ATIVO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "",
-            "quality_ok": true
+            "quality_ok": true,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0045",
@@ -139,10 +147,11 @@
             "telefone": "8006841636",
             "data_admissao": "2019-02-10",
             "base_operacional": "CD Porto Alegre - Canoas",
-            "status": "ativo",
+            "status": "ATIVO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "",
-            "quality_ok": true
+            "quality_ok": true,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0061",
@@ -155,10 +164,11 @@
             "telefone": "6121972897",
             "data_admissao": "2024-12-11",
             "base_operacional": "CD Rio de Janeiro - Duque de Caxias",
-            "status": "ativo",
+            "status": "ATIVO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "missing_cnh_expiry",
-            "quality_ok": false
+            "quality_ok": false,
+            "processed_at": null
         },
         {
             "motorista_id": "MOT-0087",
@@ -171,10 +181,11 @@
             "telefone": "8412642664",
             "data_admissao": "2022-05-21",
             "base_operacional": "CD Campinas - Sumaré",
-            "status": "ativo",
+            "status": "ATIVO",
             "ingested_at": "2026-07-02 12:00:00",
             "dq_observations": "invalid_cpf",
-            "quality_ok": false
+            "quality_ok": false,
+            "processed_at": null
         }
     ]
 }
