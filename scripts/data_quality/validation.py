@@ -10,6 +10,7 @@ from __future__ import annotations
 from data_quality.statics import (
     VALID_DRIVER_STATUS,
     VALID_GEOFENCE_TYPES,
+    VALID_TRIP_STATUS,
     VALID_VEHICLE_STATUS,
     VALID_VEHICLE_TYPES,
 )
@@ -98,6 +99,7 @@ VALIDATIONS = {
     "vehicle_status_is_valid": lambda column: column.isin(VALID_VEHICLE_STATUS),
     "vehicle_type_is_valid": lambda column: column.isin(VALID_VEHICLE_TYPES),
     "geofence_type_is_valid": lambda column: column.isin(VALID_GEOFENCE_TYPES),
+    "trip_status_is_valid": lambda column: column.isin(VALID_TRIP_STATUS),
     "geojson_polygon_is_valid": geojson_polygon_is_valid,
 }
 

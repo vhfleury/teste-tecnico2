@@ -16,3 +16,4 @@ VALID_GEOFENCE_TYPES = [
     "posto_combustivel",
     "cliente",
 ]
+VALID_TRIP_STATUS = ["em_transito", "concluida", "cancelada", "atrasada"]
