@@ -40,7 +40,9 @@ def test_apply_table_treatments_casts_to_declared_type(spark):
             {"name": "expiry_date", "type": "date"},
         ],
     }
-    df = spark.createDataFrame([("ID-1", "2024-01-31"), ("ID-2", "not a date")], ["id", "expiry_date"])
+    df = spark.createDataFrame(
+        [("ID-1", "2024-01-31"), ("ID-2", "not a date")], ["id", "expiry_date"]
+    )
 
     result = apply_table_treatments(df, config)
 
