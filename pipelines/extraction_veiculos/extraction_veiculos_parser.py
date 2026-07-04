@@ -6,9 +6,15 @@ import datetime as dt
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from parser.quality import apply_quarantine, deduplicate_by_key, trim_columns
+from parser.treatment import deduplicate_by_key, trim_columns
+from parser.validation import (
+    VALID_VEHICLE_STATUS,
+    VALID_VEHICLE_TYPES,
+    apply_quarantine,
+)
 
-from . import statics
+PLATE_MERCOSUL_REGEX = r"^[A-Z]{3}[0-9][A-Z][0-9]{2}$"
+MIN_MANUFACTURE_YEAR = 1990
 
 
 def clean_and_validate(raw: DataFrame) -> DataFrame:
@@ -45,11 +51,11 @@ def clean_and_validate(raw: DataFrame) -> DataFrame:
 
     max_year = dt.date.today().year + 1
     checks = {
-        "invalid_plate": F.col("placa").rlike(statics.PLATE_MERCOSUL_REGEX),
+        "invalid_plate": F.col("placa").rlike(PLATE_MERCOSUL_REGEX),
         "invalid_mileage": F.col("km_atual").isNotNull() & (F.col("km_atual") >= 0),
-        "invalid_year": F.col("ano_fabricacao").between(statics.MIN_MANUFACTURE_YEAR, max_year),
-        "invalid_status": F.col("status").isin(statics.VALID_STATUS),
-        "invalid_type": F.col("tipo").isin(statics.VALID_TYPES),
+        "invalid_year": F.col("ano_fabricacao").between(MIN_MANUFACTURE_YEAR, max_year),
+        "invalid_status": F.col("status").isin(VALID_VEHICLE_STATUS),
+        "invalid_type": F.col("tipo").isin(VALID_VEHICLE_TYPES),
         "missing_revision_date": F.col("data_ultima_revisao").isNotNull(),
     }
     df = apply_quarantine(df, checks)
