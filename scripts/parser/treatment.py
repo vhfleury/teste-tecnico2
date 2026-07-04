@@ -129,9 +129,9 @@ def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
         if entry.get("new_name") or name not in df.columns:
             continue
         column = _apply_entry_treatments(F.col(name), entry, table)
-        # try_cast: a malformed value becomes null (and is then flagged by
-        # the validations) instead of aborting the whole job under ANSI mode.
-        df = df.withColumn(name, column.try_cast(entry["type"]))
+        # Spark 3.5 (pinned, ANSI off): a malformed value casts to null and
+        # is then flagged by the validations, instead of aborting the job.
+        df = df.withColumn(name, column.cast(entry["type"]))
 
     key_columns = [
         entry["name"]
@@ -168,5 +168,5 @@ def apply_derived_columns(df: DataFrame, config: dict) -> DataFrame:
         if not new_name or entry["name"] not in df.columns:
             continue
         column = _apply_entry_treatments(F.col(entry["name"]), entry, table)
-        df = df.withColumn(new_name, column.try_cast(entry["type"]))
+        df = df.withColumn(new_name, column.cast(entry["type"]))
     return df
