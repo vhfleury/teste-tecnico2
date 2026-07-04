@@ -33,6 +33,7 @@ def test_cpf_is_valid_applies_format_and_check_digits(spark):
         ("999999", False),  # malformed, too short
         ("12345678909", True),  # digits-only form is accepted after normalization
         ("11111111111", False),  # all-same digits, digits-only form
+        ("", False),  # empty
         (None, False),  # missing
     ]
     df = spark.createDataFrame([(cpf,) for cpf, _ in cases], ["cpf"])
