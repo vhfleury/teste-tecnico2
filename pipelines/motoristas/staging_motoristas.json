@@ -84,11 +84,11 @@
         {
             "name": "status",
             "type": "string",
-            "treatments": ["trim", "lowercase"],
+            "treatments": ["trim", "normalize"],
             "validations": [
                 {"check": "driver_status_is_valid", "reason": "invalid_status"}
             ],
-            "example": "ativo"
+            "example": ["ATIVO", "FERIAS"]
         },
         {
             "name": "ingested_at",
@@ -104,16 +104,6 @@
             "name": "quality_ok",
             "type": "boolean",
             "example": true
-        },
-        {
-            "name": "processed_at",
-            "type": "timestamp",
-            "example": "2026-07-02 12:59:38.294138"
-        },
-        {
-            "name": "ingest_date",
-            "type": "date",
-            "example": "2026-07-02"
         }
     ]
 }
