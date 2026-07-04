@@ -16,6 +16,9 @@ def test_normalize_telefone_strips_country_code_and_trunk_zero(spark):
         ("81 6342 7352", "8163427352"),  # already bare
         ("+55 41 0184-7529", "4101847529"),  # country code, no trunk zero
         ("(62) 99876-5432", "62998765432"),  # 9-digit mobile
+        ("55 3222-1111", "5532221111"),  # DDD 55 without country code must keep its 55
+        ("+55 55 99876-5432", "55998765432"),  # country code stripped, DDD 55 kept
+        ("", ""),  # empty
         (None, None),  # missing stays missing
     ]
     df = spark.createDataFrame([(telefone,) for telefone, _ in cases], ["telefone"])
@@ -60,12 +63,15 @@ def test_telefone_is_valid_checks_ddd_and_subscriber(spark):
         ("+55 (071) 2827-1996", True),  # landline with country code + trunk zero
         ("(62) 99876-5432", True),  # 9-digit mobile
         ("81 6342 7352", True),  # bare landline
+        ("55 3222-1111", True),  # DDD 55 landline, not mistaken for country code
         ("+55 (021) 0935-2257", False),  # subscriber starts with 0
         ("81 0878 5042", False),  # subscriber starts with 0
+        ("81 1878 5042", False),  # subscriber starts with 1
         ("(20) 3333-4444", False),  # DDD does not exist
         ("(62) 89876-5432", False),  # 11 digits but not a mobile (no leading 9)
         ("1234", False),  # too short
         ("abc", False),  # no digits
+        ("", False),  # empty
         (None, False),  # missing
     ]
     df = spark.createDataFrame([(telefone,) for telefone, _ in cases], ["telefone"])
