@@ -1,13 +1,45 @@
 """Generic validation helpers shared by every pipeline.
 
-Validations never mutate values: they flag rows (`apply_quarantine`) or
-abort the pipeline when the data drifts from its table config
-(`enforce_table_config`). Value-changing logic lives in ``treatment.py``.
+Validations never mutate valid values: they flag rows
+(`apply_table_validations` / `apply_quarantine`) or abort the pipeline
+when the data drifts from its table config (`enforce_table_config`).
+Value-changing logic lives in ``parser/treatment.py``.
 """
 from __future__ import annotations
 
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
+
+from data_quality.statics import VALID_DRIVER_STATUS, VALID_VEHICLE_STATUS, VALID_VEHICLE_TYPES
+from parser.parser_cnh import cnh_category_is_valid, cnh_is_valid
+from parser.parser_cpf import cpf_is_valid
+
+
+def required(column: Column) -> Column:
+    """Validate that a value is present: not null and not empty.
+
+    Args:
+        column: Column of any type to check.
+
+    Returns:
+        Boolean column, False when the value is null or an empty
+        string.
+    """
+    return column.isNotNull() & (column.cast("string") != "")
+
+
+# Checks a table config can declare on a column (`validations`). Each
+# check maps to a boolean column that is True when the value is valid;
+# `apply_table_validations` wraps it null-safely (null => invalid).
+VALIDATIONS = {
+    "required": required,
+    "cpf_is_valid": cpf_is_valid,
+    "cnh_is_valid": cnh_is_valid,
+    "cnh_category_is_valid": cnh_category_is_valid,
+    "driver_status_is_valid": lambda column: column.isin(VALID_DRIVER_STATUS),
+    "vehicle_status_is_valid": lambda column: column.isin(VALID_VEHICLE_STATUS),
+    "vehicle_type_is_valid": lambda column: column.isin(VALID_VEHICLE_TYPES),
+}
 
 
 def apply_quarantine(df: DataFrame, checks: dict[str, Column]) -> DataFrame:
@@ -34,6 +66,60 @@ def apply_quarantine(df: DataFrame, checks: dict[str, Column]) -> DataFrame:
         ),
     )
     return df.withColumn("quality_ok", F.length("dq_observations") == 0)
+
+
+def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
+    """Run the validations declared in the table config (quarantine).
+
+    Each ``schema`` entry may declare ``validations``: a list of
+    ``{"check", "reason"}`` pairs, where ``check`` is a key of
+    ``VALIDATIONS`` and ``reason`` is the label recorded in
+    `dq_observations`. Every check is wrapped null-safely (a null
+    boolean counts as invalid). Failing rows are flagged, never
+    dropped, and the failing value is nulled out - the row keeps its
+    primary key so joins still work.
+
+    Args:
+        df: DataFrame already standardized by the treatments.
+        config: Parsed table config with `schema` entries that may
+            declare `validations`.
+
+    Returns:
+        The DataFrame with `dq_observations`/`quality_ok` added and
+        every failing value nulled out.
+
+    Raises:
+        ValueError: If a declared check is not in `VALIDATIONS` -
+            the config demands exactly that check, so an unknown one
+            must abort instead of being skipped.
+    """
+    table = config.get("table_name", "<unknown>")
+    checks: dict[str, Column] = {}
+    column_conditions: dict[str, list[Column]] = {}
+    for entry in config["schema"]:
+        name = entry["name"]
+        if entry.get("new_name") or name not in df.columns:
+            continue
+        for validation in entry.get("validations", []):
+            check, reason = validation["check"], validation["reason"]
+            if check not in VALIDATIONS:
+                raise ValueError(
+                    f"Unknown validation '{check}' for column '{name}' "
+                    f"in table config '{table}'"
+                )
+            condition = F.coalesce(VALIDATIONS[check](F.col(name)), F.lit(False))
+            checks[reason] = condition
+            column_conditions.setdefault(name, []).append(condition)
+
+    df = apply_quarantine(df, checks)
+
+    # Quarantine: null out the failing value but keep the row.
+    for name, conditions in column_conditions.items():
+        passed = conditions[0]
+        for condition in conditions[1:]:
+            passed = passed & condition
+        df = df.withColumn(name, F.when(passed, F.col(name)))
+    return df
 
 
 def enforce_table_config(df: DataFrame, config: dict) -> DataFrame:
