@@ -1,12 +1,11 @@
 """Unit tests for the shared validation helpers."""
 import pytest
-from pyspark.sql import functions as F
-
 from data_quality.validation import (
     apply_quarantine,
     apply_table_validations,
     enforce_table_config,
 )
+from pyspark.sql import functions as F
 
 TABLE_CONFIG = {
     "table_name": "staging_example",
@@ -118,6 +117,69 @@ def test_apply_table_validations_treats_null_check_result_as_invalid(spark):
 
     assert [(row["dq_observations"], row["quality_ok"]) for row in result] == [
         ("invalid_status", False)
+    ]
+
+
+def test_apply_table_validations_plate_check_accepts_both_formats(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "placa",
+                "type": "string",
+                "validations": [{"check": "plate_is_valid", "reason": "invalid_plate"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("VEI-0001", "ABC1234"),
+            ("VEI-0002", "ABC1D23"),
+            ("VEI-0003", "INVALIDA"),
+            ("VEI-0004", None),
+        ],
+        ["veiculo_id", "placa"],
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # Old and Mercosul formats pass; a malformed or null plate is flagged.
+    assert [
+        (row["veiculo_id"], row["placa"], row["dq_observations"], row["quality_ok"])
+        for row in result
+    ] == [
+        ("VEI-0001", "ABC1234", "", True),
+        ("VEI-0002", "ABC1D23", "", True),
+        ("VEI-0003", None, "invalid_plate", False),
+        ("VEI-0004", None, "invalid_plate", False),
+    ]
+
+
+def test_apply_table_validations_non_negative_flags_negative_values(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "km_atual",
+                "type": "int",
+                "validations": [{"check": "non_negative", "reason": "negative_mileage"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [("VEI-0001", 768660), ("VEI-0002", 0), ("VEI-0003", -201014)],
+        "veiculo_id string, km_atual int",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    assert [
+        (row["veiculo_id"], row["km_atual"], row["dq_observations"], row["quality_ok"])
+        for row in result
+    ] == [
+        ("VEI-0001", 768660, "", True),
+        ("VEI-0002", 0, "", True),
+        ("VEI-0003", None, "negative_mileage", False),
     ]
 
 

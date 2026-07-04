@@ -73,6 +73,25 @@ def load_table_config(path: str) -> dict:
         return json.load(file)
 
 
+def resolve_ingest_date(context: dict) -> str:
+    """Resolve the run's ingestion date from the task context.
+
+    Manual runs triggered without a logical date (e.g. ``airflow dags
+    trigger`` on the CLI) have ``logical_date=None`` and therefore no
+    ``ds`` in the context, so fall back to the run's ``run_after``.
+
+    Args:
+        context: Airflow task context.
+
+    Returns:
+        The ingestion date in `YYYY-MM-DD` format.
+    """
+    ds = context.get("ds")
+    if ds:
+        return ds
+    return context["dag_run"].run_after.strftime("%Y-%m-%d")
+
+
 def partition_processed(path: str) -> bool:
     """Check whether a partition was already written successfully.
 

@@ -1,0 +1,109 @@
+{
+    "table_name": "staging_veiculos",
+    "description": "Vehicle registry cleaned and validated (staging layer)",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "veiculo_id",
+            "type": "string",
+            "key": true,
+            "treatments": ["trim", "normalize"],
+            "example": "VEI-0001"
+        },
+        {
+            "name": "placa",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "validations": [
+                {"check": "plate_is_valid", "reason": "invalid_plate"}
+            ],
+            "example": "PFX4S35"
+        },
+        {
+            "name": "marca",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "example": "VOLVO"
+        },
+        {
+            "name": "modelo",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "example": "VM 270"
+        },
+        {
+            "name": "ano_fabricacao",
+            "type": "int",
+            "example": 2025
+        },
+        {
+            "name": "tipo",
+            "type": "string",
+            "treatments": ["trim"],
+            "validations": [
+                {"check": "vehicle_type_is_valid", "reason": "invalid_vehicle_type"}
+            ],
+            "example": "Carreta LS"
+        },
+        {
+            "name": "capacidade_kg",
+            "type": "int",
+            "example": 41500
+        },
+        {
+            "name": "capacidade_paletes",
+            "type": "int",
+            "example": 30
+        },
+        {
+            "name": "km_atual",
+            "type": "int",
+            "validations": [
+                {"check": "non_negative", "reason": "negative_mileage"}
+            ],
+            "example": 768660
+        },
+        {
+            "name": "status",
+            "type": "string",
+            "treatments": ["trim", "lowercase"],
+            "validations": [
+                {"check": "vehicle_status_is_valid", "reason": "invalid_status"}
+            ],
+            "example": ["ativo", "em_manutencao"]
+        },
+        {
+            "name": "data_ultima_revisao",
+            "type": "date",
+            "validations": [
+                {"check": "required", "reason": "missing_revision_date"}
+            ],
+            "example": "2025-08-16"
+        },
+        {
+            "name": "source_file",
+            "type": "string",
+            "example": "/opt/airflow/data/veiculos/veiculos.csv"
+        },
+        {
+            "name": "ingested_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:00:00.000000"
+        },
+        {
+            "name": "dq_observations",
+            "type": "string",
+            "example": "invalid_plate;negative_mileage"
+        },
+        {
+            "name": "quality_ok",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00.000000"
+        }
+    ]
+}

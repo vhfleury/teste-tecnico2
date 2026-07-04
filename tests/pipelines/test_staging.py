@@ -17,10 +17,10 @@ import json
 import os
 
 import pytest
-from pyspark.sql import functions as F
-
 from data_quality.validation import enforce_table_config
 from general.utils import load_table_config
+from pyspark.sql import functions as F
+
 from tests.pipelines.diff import assert_matches_expected, dataframe_to_rows
 
 PIPELINES_ROOT = os.path.join(

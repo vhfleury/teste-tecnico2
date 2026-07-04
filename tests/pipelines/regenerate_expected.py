@@ -23,7 +23,9 @@ from tests.pipelines.test_staging import PIPELINES_ROOT, discover_pipelines, pro
 def main() -> None:
     names = discover_pipelines(require_expected=False)
     if len(sys.argv) != 2 or sys.argv[1] not in names:
-        raise SystemExit(f"usage: python -m tests.pipelines.regenerate_expected [{'|'.join(names)}]")
+        raise SystemExit(
+            f"usage: python -m tests.pipelines.regenerate_expected [{'|'.join(names)}]"
+        )
     name = sys.argv[1]
 
     spark = get_spark("regenerate-expected", master="local[1]")

@@ -1,23 +1,30 @@
-"""extraction_veiculos pipeline: raw -> staging for the vehicle registry.
+"""veiculos pipeline: the vehicle registry.
 
 Two stages, one task each:
 
-* ``extract_to_raw``      — reads the raw CSV (unchanged) and writes it to
-  the raw layer.
-* ``transform_to_staging`` — reads the raw layer, cleans/validates it and
-  writes the result to the staging layer.
+* ``extract_to_raw``      — reads the source CSV (unchanged) and writes it
+  to the raw layer.
+* ``transform_to_staging`` — reads the raw layer, cleans/validates it
+  (`clean_and_validate`), applies the table-config treatments and writes
+  the result to the staging layer.
 """
 from __future__ import annotations
 
 import logging
 import os
 
-from pyspark.sql import SparkSession
+from data_quality.validation import apply_table_validations, enforce_table_config
+from general.utils import (
+    DATA_DIR,
+    load_table_config,
+    raw_dir,
+    raw_path,
+    staging_dir,
+    staging_path,
+)
+from parser.treatment import apply_derived_columns, apply_table_treatments
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
-
-from scripts.utils import DATA_DIR, raw_dir, raw_path, staging_dir, staging_path
-
-from .extraction_veiculos_parser import clean_and_validate
 
 log = logging.getLogger(__name__)
 
@@ -27,13 +34,16 @@ VEICULOS_CSV = os.path.join(DATA_DIR, SOURCE, f"{SOURCE}.csv")
 RAW_DIR = raw_dir(SOURCE)
 STAGING_DIR = staging_dir(SOURCE)
 
+# Table config (contract) of the staging table written by this pipeline.
+TABLE_CONFIG = os.path.join(os.path.dirname(__file__), f"staging_{SOURCE}.json")
+
 
 def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
     """Read veiculos.csv and write it to the raw layer, unchanged.
 
-    All columns are read as strings, faithful to the source, so no
-    dirty value (e.g. a negative mileage) is masked by an early
-    cast. Typing happens in the staging stage.
+    Every column is read as a string (no schema inference), faithful
+    to the source, so no dirty value (e.g. a negative mileage) is
+    masked by an early cast. Typing happens in the staging stage.
 
     Args:
         spark: Active SparkSession.
@@ -64,6 +74,30 @@ def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
     return {"layer": "raw", "path": destination, "records": total}
 
 
+def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
+    """Standardize, validate and derive columns as the config declares.
+
+    Pure DataFrame -> DataFrame transformation, kept separate from
+    I/O so it can be unit-tested with synthetic data. Every rule
+    lives in the table config: treatments/cast/dedup first, then the
+    quarantine validations (invalid values are nulled but the row
+    keeps its primary key), and finally the derived columns.
+
+    Args:
+        raw: Raw vehicle registry DataFrame, as read from the raw
+            layer.
+        config: Parsed table config (the staging contract).
+
+    Returns:
+        The cleaned DataFrame with quarantine flags and a
+        `processed_at` timestamp column.
+    """
+    df = apply_table_treatments(raw, config)
+    df = apply_table_validations(df, config)
+    df = apply_derived_columns(df, config)
+    return df.withColumn("processed_at", F.current_timestamp())
+
+
 def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
     """Read the raw layer, clean/validate it and write staging.
 
@@ -84,7 +118,15 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
     total_in = raw.count()
     log.info("Raw layer read: %d records", total_in)
 
-    df = clean_and_validate(raw)
+    # The table config is the staging contract: declared treatments and
+    # validations are applied and wrong columns/types abort the write.
+    config = load_table_config(TABLE_CONFIG)
+    df = clean_and_validate(raw, config)
+    df = enforce_table_config(df, config)
+    log.info(
+        "Treatments applied and schema validated against table config '%s'",
+        config["table_name"],
+    )
 
     destination = staging_path(STAGING_DIR, ingest_date)
     log.info("Writing staging layer to %s", destination)

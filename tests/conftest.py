@@ -11,7 +11,7 @@ for path in (ROOT, os.path.join(ROOT, "pipelines"), os.path.join(ROOT, "scripts"
     if path not in sys.path:
         sys.path.insert(0, path)
 
-from connections.spark_session import get_spark
+from connections.spark_session import get_spark  # noqa: E402  (needs the sys.path setup above)
 
 
 @pytest.fixture(scope="session")

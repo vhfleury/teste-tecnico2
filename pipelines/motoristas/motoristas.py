@@ -13,9 +13,6 @@ from __future__ import annotations
 import logging
 import os
 
-from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql import functions as F
-
 from data_quality.validation import apply_table_validations, enforce_table_config
 from general.utils import (
     DATA_DIR,
@@ -26,6 +23,8 @@ from general.utils import (
     staging_path,
 )
 from parser.treatment import apply_derived_columns, apply_table_treatments
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 log = logging.getLogger(__name__)
 

@@ -1,7 +1,6 @@
 """Unit tests for the shared CPF validation helpers."""
-from pyspark.sql import functions as F
-
 from parser.parser_cpf import cpf_is_valid, normalize_cpf
+from pyspark.sql import functions as F
 
 
 def test_normalize_cpf_keeps_only_digits(spark):

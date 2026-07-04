@@ -1,10 +1,9 @@
 """Brazilian phone number validation helpers shared by every pipeline."""
 from __future__ import annotations
 
+from parser.statics import DDD_UF
 from pyspark.sql import Column
 from pyspark.sql import functions as F
-
-from parser.statics import DDD_UF
 
 
 def normalize_telefone(telefone: Column) -> Column:
