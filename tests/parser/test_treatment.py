@@ -1,8 +1,14 @@
 """Unit tests for the shared treatment helpers."""
-import pytest
-from pyspark.errors import AnalysisException
+import datetime
 
-from parser.treatment import apply_table_treatments, deduplicate_by_key, trim_columns
+import pytest
+
+from parser.treatment import (
+    apply_derived_columns,
+    apply_table_treatments,
+    deduplicate_by_key,
+    trim_columns,
+)
 
 TABLE_CONFIG = {
     "table_name": "staging_example",
@@ -18,43 +24,52 @@ TABLE_CONFIG = {
 def test_apply_table_treatments_normalize_uppercases_text(spark):
     config = {
         "table_name": "staging_example",
-        "schema": [{"name": "nome", "type": "string", "treatment": "normalize"}],
+        "schema": [{"name": "nome", "type": "string", "treatments": ["trim", "normalize"]}],
     }
-    df = spark.createDataFrame([("Ana Souza",), (None,)], ["nome"])
+    df = spark.createDataFrame([("  Ana Souza ",), (None,)], ["nome"])
 
     result = apply_table_treatments(df, config).collect()
 
     assert [row["nome"] for row in result] == ["ANA SOUZA", None]
 
 
-def test_apply_table_treatments_new_name_creates_derived_column(spark):
+def test_apply_table_treatments_casts_to_declared_type(spark):
     config = {
         "table_name": "staging_example",
         "schema": [
-            {"name": "cpf", "type": "string", "treatment": "cpf_is_valid"},
-            {
-                "name": "cpf",
-                "type": "string",
-                "treatment": "normalize_cpf",
-                "new_name": "cpf_normalize",
-            },
+            {"name": "id", "type": "string"},
+            {"name": "expiry_date", "type": "date"},
         ],
     }
+    df = spark.createDataFrame([("ID-1", "2024-01-31"), ("ID-2", "not a date")], ["id", "expiry_date"])
+
+    result = apply_table_treatments(df, config)
+
+    assert dict(result.dtypes)["expiry_date"] == "date"
+    assert [row["expiry_date"] for row in result.collect()] == [
+        datetime.date(2024, 1, 31),
+        None,  # unparseable date becomes null, flagged later by validations
+    ]
+
+
+def test_apply_table_treatments_deduplicates_by_declared_key(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [{"name": "id", "type": "string", "key": True}],
+    }
     df = spark.createDataFrame(
-        [("529.982.247-25",), ("111.111.111-11",)],  # valid / invalid check digits
-        ["cpf"],
+        [("ID-1",), ("ID-1",), (None,), ("",), ("ID-2",)],
+        ["id"],
     )
 
     result = apply_table_treatments(df, config).collect()
 
-    # cpf_is_valid keeps only valid CPFs; the derived column holds the digits.
-    assert [(row["cpf"], row["cpf_normalize"]) for row in result] == [
-        ("529.982.247-25", "52998224725"),
-        (None, None),
-    ]
+    assert sorted(row["id"] for row in result) == ["ID-1", "ID-2"]
 
 
-def test_apply_table_treatments_without_treatment_keeps_column(spark):
+def test_apply_table_treatments_skips_absent_columns(spark):
+    # Partition/metadata columns declared in the config are added later in
+    # the flow; enforce_table_config catches a genuinely missing column.
     df = spark.createDataFrame([("ID-1", 10)], ["id", "amount"])
 
     result = apply_table_treatments(df, TABLE_CONFIG).collect()
@@ -65,7 +80,7 @@ def test_apply_table_treatments_without_treatment_keeps_column(spark):
 def test_apply_table_treatments_fails_on_unknown_treatment(spark):
     config = {
         "table_name": "staging_example",
-        "schema": [{"name": "nome", "type": "string", "treatment": "does_not_exist"}],
+        "schema": [{"name": "nome", "type": "string", "treatments": ["does_not_exist"]}],
     }
     df = spark.createDataFrame([("Ana Souza",)], ["nome"])
 
@@ -76,7 +91,7 @@ def test_apply_table_treatments_fails_on_unknown_treatment(spark):
 def test_apply_table_treatments_normalize_telefone_via_config(spark):
     config = {
         "table_name": "staging_example",
-        "schema": [{"name": "telefone", "type": "string", "treatment": "normalize_telefone"}],
+        "schema": [{"name": "telefone", "type": "string", "treatments": ["normalize_telefone"]}],
     }
     df = spark.createDataFrame([("+55 (071) 2827-1996",)], ["telefone"])
 
@@ -85,15 +100,28 @@ def test_apply_table_treatments_normalize_telefone_via_config(spark):
     assert [row["telefone"] for row in result] == ["7128271996"]
 
 
-def test_apply_table_treatments_fails_on_missing_column(spark):
+def test_apply_derived_columns_creates_new_column_from_source(spark):
     config = {
         "table_name": "staging_example",
-        "schema": [{"name": "missing", "type": "string", "treatment": "normalize"}],
+        "schema": [
+            {"name": "cpf", "type": "string"},
+            {
+                "name": "cpf",
+                "type": "string",
+                "treatments": ["normalize_cpf"],
+                "new_name": "cpf_normalize",
+            },
+        ],
     }
-    df = spark.createDataFrame([("Ana Souza",)], ["nome"])
+    df = spark.createDataFrame([("529.982.247-25",), (None,)], ["cpf"])
 
-    with pytest.raises(AnalysisException):
-        apply_table_treatments(df, config)
+    result = apply_derived_columns(df, config).collect()
+
+    # The source column is untouched; a null source derives null.
+    assert [(row["cpf"], row["cpf_normalize"]) for row in result] == [
+        ("529.982.247-25", "52998224725"),
+        (None, None),
+    ]
 
 
 def test_trim_columns_strips_only_the_given_columns(spark):
