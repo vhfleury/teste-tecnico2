@@ -32,7 +32,12 @@
             "name": "latitude",
             "type": "double",
             "validations": [
-                {"check": "non_zero", "reason": "zeroed_latitude"}
+                {"check": "non_zero", "reason": "zeroed_latitude"},
+                {
+                    "check": "coordinates_in_brazil",
+                    "reason": "coordinates_outside_brazil",
+                    "columns": ["latitude", "longitude"]
+                }
             ],
             "example": -8.066642
         },
@@ -87,7 +92,7 @@
         {
             "name": "dq_observations",
             "type": "string",
-            "example": "zeroed_latitude;zeroed_longitude"
+            "example": "coordinates_outside_brazil"
         },
         {
             "name": "quality_ok",
