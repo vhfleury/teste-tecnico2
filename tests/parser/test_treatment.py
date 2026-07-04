@@ -1,7 +1,8 @@
 """Unit tests for the shared treatment helpers."""
 import pytest
+from pyspark.errors import AnalysisException
 
-from parser.treatment import apply_table_treatments
+from parser.treatment import apply_table_treatments, deduplicate_by_key, trim_columns
 
 TABLE_CONFIG = {
     "table_name": "staging_example",
@@ -70,3 +71,77 @@ def test_apply_table_treatments_fails_on_unknown_treatment(spark):
 
     with pytest.raises(ValueError, match="Unknown treatment 'does_not_exist'"):
         apply_table_treatments(df, config)
+
+
+def test_apply_table_treatments_normalize_telefone_via_config(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [{"name": "telefone", "type": "string", "treatment": "normalize_telefone"}],
+    }
+    df = spark.createDataFrame([("+55 (071) 2827-1996",)], ["telefone"])
+
+    result = apply_table_treatments(df, config).collect()
+
+    assert [row["telefone"] for row in result] == ["7128271996"]
+
+
+def test_apply_table_treatments_fails_on_missing_column(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [{"name": "missing", "type": "string", "treatment": "normalize"}],
+    }
+    df = spark.createDataFrame([("Ana Souza",)], ["nome"])
+
+    with pytest.raises(AnalysisException):
+        apply_table_treatments(df, config)
+
+
+def test_trim_columns_strips_only_the_given_columns(spark):
+    df = spark.createDataFrame(
+        [("  ID-1  ", "  Ana Souza ", "  untouched  "), (None, "no trim needed", None)],
+        ["id", "nome", "extra"],
+    )
+
+    result = trim_columns(df, ["id", "nome"]).collect()
+
+    assert [(row["id"], row["nome"], row["extra"]) for row in result] == [
+        ("ID-1", "Ana Souza", "  untouched  "),
+        (None, "no trim needed", None),
+    ]
+
+
+def test_deduplicate_by_key_drops_null_empty_and_duplicate_keys(spark):
+    df = spark.createDataFrame(
+        [
+            ("ID-1", "kept"),
+            ("ID-1", "duplicate of ID-1"),
+            (None, "null key"),
+            ("", "empty key"),
+            ("ID-2", "kept"),
+        ],
+        ["id", "label"],
+    )
+
+    result = deduplicate_by_key(df, ["id"]).collect()
+
+    assert sorted(row["id"] for row in result) == ["ID-1", "ID-2"]
+
+
+def test_deduplicate_by_key_requires_every_column_of_a_composite_key(spark):
+    df = spark.createDataFrame(
+        [
+            ("ID-1", "2024-01-01", "kept"),
+            ("ID-1", "2024-01-02", "kept, other second key"),
+            ("ID-1", "2024-01-01", "duplicate composite key"),
+            ("ID-1", None, "null second key"),
+            ("ID-1", "", "empty second key"),
+        ],
+        ["id", "event_date", "label"],
+    )
+
+    result = deduplicate_by_key(df, ["id", "event_date"]).collect()
+
+    assert sorted((row["id"], row["event_date"]) for row in result) == [
+        ("ID-1", "2024-01-01"),
+        ("ID-1", "2024-01-02"),
+    ]
