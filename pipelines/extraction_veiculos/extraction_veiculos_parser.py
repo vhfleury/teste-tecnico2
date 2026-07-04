@@ -2,50 +2,19 @@
 from __future__ import annotations
 
 import datetime as dt
-import os
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from parser.quality import apply_quarantine, deduplicate_by_key, trim_columns
+from parser.treatment import deduplicate_by_key, trim_columns
+from parser.validation import (
+    VALID_VEHICLE_STATUS,
+    VALID_VEHICLE_TYPES,
+    apply_quarantine,
+)
 
-from . import statics
-
-
-def raw_path(ingest_date: str) -> str:
-    """Build the partitioned raw path for a given ingestion date.
-
-    Args:
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The raw layer path for that partition.
-    """
-    return f"{statics.RAW_DIR}/ingest_date={ingest_date}"
-
-
-def staging_path(ingest_date: str) -> str:
-    """Build the partitioned staging path for a given ingestion date.
-
-    Args:
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The staging layer path for that partition.
-    """
-    return f"{statics.STAGING_DIR}/ingest_date={ingest_date}"
-
-
-def partition_processed(path: str) -> bool:
-    """Check whether a partition was already written successfully.
-
-    Args:
-        path: Path to the partition directory.
-
-    Returns:
-        True if a `_SUCCESS` marker exists under `path`.
-    """
-    return os.path.exists(os.path.join(path, "_SUCCESS"))
+PLATE_MERCOSUL_REGEX = r"^[A-Z]{3}[0-9][A-Z][0-9]{2}$"
+MIN_MANUFACTURE_YEAR = 1990
 
 
 def clean_and_validate(raw: DataFrame) -> DataFrame:
@@ -82,11 +51,11 @@ def clean_and_validate(raw: DataFrame) -> DataFrame:
 
     max_year = dt.date.today().year + 1
     checks = {
-        "invalid_plate": F.col("placa").rlike(statics.PLATE_MERCOSUL_REGEX),
+        "invalid_plate": F.col("placa").rlike(PLATE_MERCOSUL_REGEX),
         "invalid_mileage": F.col("km_atual").isNotNull() & (F.col("km_atual") >= 0),
-        "invalid_year": F.col("ano_fabricacao").between(statics.MIN_MANUFACTURE_YEAR, max_year),
-        "invalid_status": F.col("status").isin(statics.VALID_STATUS),
-        "invalid_type": F.col("tipo").isin(statics.VALID_TYPES),
+        "invalid_year": F.col("ano_fabricacao").between(MIN_MANUFACTURE_YEAR, max_year),
+        "invalid_status": F.col("status").isin(VALID_VEHICLE_STATUS),
+        "invalid_type": F.col("tipo").isin(VALID_VEHICLE_TYPES),
         "missing_revision_date": F.col("data_ultima_revisao").isNotNull(),
     }
     df = apply_quarantine(df, checks)

@@ -4,19 +4,21 @@ from __future__ import annotations
 from pyspark.sql import SparkSession
 
 
-def get_spark(app_name: str) -> SparkSession:
+def get_spark(app_name: str, master: str = "local[*]") -> SparkSession:
     """Create or reuse a local SparkSession for small datasets.
 
     Args:
         app_name: Name shown for the Spark application in the UI
             and logs.
+        master: Spark master URL. Tests pass `local[1]` to avoid
+            spawning one Python worker per core on Windows.
 
     Returns:
         A SparkSession configured to run in local mode.
     """
     return (
         SparkSession.builder.appName(app_name)
-        .master("local[*]")
+        .master(master)
         .config("spark.sql.shuffle.partitions", "4")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.ui.showConsoleProgress", "false")
