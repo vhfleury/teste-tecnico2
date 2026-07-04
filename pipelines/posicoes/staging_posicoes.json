@@ -1,0 +1,103 @@
+{
+    "table_name": "staging_posicoes",
+    "description": "Vehicle tracking positions cleaned and validated (staging layer)",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "posicao_id",
+            "type": "string",
+            "key": true,
+            "treatments": ["trim", "normalize"],
+            "example": "POS-367FE6FF0F"
+        },
+        {
+            "name": "viagem_id",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "validations": [
+                {"check": "required", "reason": "missing_trip_id"}
+            ],
+            "example": "VIA-000003"
+        },
+        {
+            "name": "veiculo_id",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "validations": [
+                {"check": "required", "reason": "missing_vehicle_id"}
+            ],
+            "example": "VEI-0116"
+        },
+        {
+            "name": "latitude",
+            "type": "double",
+            "validations": [
+                {"check": "non_zero", "reason": "zeroed_latitude"}
+            ],
+            "example": -8.066642
+        },
+        {
+            "name": "longitude",
+            "type": "double",
+            "validations": [
+                {"check": "non_zero", "reason": "zeroed_longitude"}
+            ],
+            "example": -35.070495
+        },
+        {
+            "name": "timestamp",
+            "type": "timestamp",
+            "validations": [
+                {"check": "required", "reason": "missing_timestamp"}
+            ],
+            "example": "2026-04-28 21:34:58.588212"
+        },
+        {
+            "name": "velocidade_kmh",
+            "type": "int",
+            "validations": [
+                {"check": "non_negative", "reason": "negative_speed"},
+                {"check": "speed_within_limit", "reason": "speed_above_limit"}
+            ],
+            "example": 41
+        },
+        {
+            "name": "ignicao",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "odometro_metros",
+            "type": "double",
+            "validations": [
+                {"check": "non_negative", "reason": "negative_odometer"}
+            ],
+            "example": 92100.0
+        },
+        {
+            "name": "source_file",
+            "type": "string",
+            "example": "/opt/airflow/data/rastreamento/posicoes.parquet"
+        },
+        {
+            "name": "ingested_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:00:00.000000"
+        },
+        {
+            "name": "dq_observations",
+            "type": "string",
+            "example": "zeroed_latitude;zeroed_longitude"
+        },
+        {
+            "name": "quality_ok",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00.000000"
+        }
+    ]
+}
