@@ -1,18 +1,32 @@
 """geocercas pipeline: the geofence registry.
 
-First stage only (staging comes in a later phase):
+Two stages, one task each:
 
-* ``extract_to_raw`` — reads the source GeoJSON (unchanged values) and
+* ``extract_to_raw``      — reads the source GeoJSON (unchanged values) and
   writes it to the raw layer, one row per feature.
+* ``transform_to_staging`` — reads the raw layer, flattens the GeoJSON
+  feature shape (`flatten_features`, exclusive treatment of this source),
+  cleans/validates it (`clean_and_validate`), applies the table-config
+  treatments and writes the result to the staging layer.
 """
 from __future__ import annotations
 
 import logging
 import os
 
-from general.utils import DATA_DIR, raw_dir, raw_path
-from pyspark.sql import SparkSession
+from data_quality.validation import apply_table_validations, enforce_table_config
+from general.utils import (
+    DATA_DIR,
+    load_table_config,
+    raw_dir,
+    raw_path,
+    staging_dir,
+    staging_path,
+)
+from parser.treatment import apply_derived_columns, apply_table_treatments
+from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.types import StructType
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +34,13 @@ SOURCE = "geocercas"
 
 GEOCERCAS_GEOJSON = os.path.join(DATA_DIR, SOURCE, f"{SOURCE}.geojson")
 RAW_DIR = raw_dir(SOURCE)
+STAGING_DIR = staging_dir(SOURCE)
+
+# Table config (contract) of the staging table written by this pipeline.
+TABLE_CONFIG = os.path.join(os.path.dirname(__file__), f"staging_{SOURCE}.json")
+
+# properties.* fields promoted to flat staging columns.
+PROPERTY_FIELDS = ["geocerca_id", "nome", "tipo", "uf", "raio_km", "ativo"]
 
 
 def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
@@ -63,3 +84,156 @@ def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
     log.info("Extraction finished - %d records written to raw", total)
 
     return {"layer": "raw", "path": destination, "records": total}
+
+
+def _struct_fields(df: DataFrame, column: str) -> list[str]:
+    """Names of the nested fields of a struct column (empty when absent).
+
+    Args:
+        df: DataFrame to inspect.
+        column: Name of the (possibly missing) struct column.
+
+    Returns:
+        The nested field names, or an empty list when the column is
+        missing or not a struct.
+    """
+    if column not in df.columns:
+        return []
+    data_type = df.schema[column].dataType
+    if not isinstance(data_type, StructType):
+        return []
+    return [field.name for field in data_type.fields]
+
+
+def flatten_features(raw: DataFrame) -> DataFrame:
+    """Flatten the GeoJSON feature shape into staging columns.
+
+    Exclusive treatment of this source: promotes each ``properties.*``
+    field to a flat column and serializes ``geometry`` to a canonical
+    GeoJSON string with numeric coordinates (the raw layer reads every
+    primitive as a string). A field absent from the whole partition
+    becomes a null column, so the config validations flag it instead
+    of the job crashing on a missing path.
+
+    Args:
+        raw: Raw geofence DataFrame, as read from the raw layer
+            (one row per feature).
+
+    Returns:
+        The flat DataFrame with one column per property, the
+        serialized geometry and the raw metadata columns.
+    """
+    property_fields = _struct_fields(raw, "properties")
+    columns: list[Column] = []
+    for field in PROPERTY_FIELDS:
+        if field in property_fields:
+            columns.append(F.col(f"properties.{field}").alias(field))
+        else:
+            columns.append(F.lit(None).cast("string").alias(field))
+
+    if {"type", "coordinates"} <= set(_struct_fields(raw, "geometry")):
+        canonical = F.to_json(
+            F.struct(
+                F.col("geometry.type").alias("type"),
+                F.col("geometry.coordinates")
+                .cast("array<array<array<double>>>")
+                .alias("coordinates"),
+            )
+        )
+        geometry = F.when(F.col("geometry").isNotNull(), canonical)
+    else:
+        geometry = F.lit(None).cast("string")
+    columns.append(geometry.alias("geometry"))
+
+    return raw.select(*columns, "source_file", "ingested_at")
+
+
+def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
+    """Standardize, validate and derive columns as the config declares.
+
+    Pure DataFrame -> DataFrame transformation, kept separate from
+    I/O so it can be unit-tested with synthetic data. The GeoJSON
+    flattening is the only source-exclusive step; every other rule
+    lives in the table config: treatments/cast/dedup first, then the
+    quarantine validations (invalid values are nulled but the row
+    keeps its primary key), and finally the derived columns.
+
+    Args:
+        raw: Raw geofence DataFrame, as read from the raw layer.
+        config: Parsed table config (the staging contract).
+
+    Returns:
+        The cleaned DataFrame with quarantine flags and a
+        `processed_at` timestamp column.
+    """
+    df = flatten_features(raw)
+    df = apply_table_treatments(df, config)
+    df = apply_table_validations(df, config)
+    df = apply_derived_columns(df, config)
+    return df.withColumn("processed_at", F.current_timestamp())
+
+
+def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
+    """Read the raw layer, clean/validate it and write staging.
+
+    Args:
+        spark: Active SparkSession.
+        ingest_date: Ingestion date in `YYYY-MM-DD` format, used
+            to locate the raw partition and to partition the
+            staging layer.
+
+    Returns:
+        Metrics about the write: layer name, destination path,
+        input/output record counts and how many were flagged for
+        quality.
+    """
+    source = raw_path(RAW_DIR, ingest_date)
+    log.info("Starting transform - reading raw layer from %s", source)
+    raw = spark.read.parquet(source)
+    total_in = raw.count()
+    log.info("Raw layer read: %d records", total_in)
+
+    # The table config is the staging contract: declared treatments and
+    # validations are applied and wrong columns/types abort the write.
+    config = load_table_config(TABLE_CONFIG)
+    df = clean_and_validate(raw, config)
+    df = enforce_table_config(df, config)
+    log.info(
+        "Treatments applied and schema validated against table config '%s'",
+        config["table_name"],
+    )
+
+    destination = staging_path(STAGING_DIR, ingest_date)
+    log.info("Writing staging layer to %s", destination)
+    df.coalesce(1).write.mode("overwrite").parquet(destination)
+
+    total_out = df.count()
+    flagged = df.filter(~F.col("quality_ok")).count()
+
+    dropped = total_in - total_out
+    if dropped:
+        log.info("%d record(s) dropped (missing key or duplicate)", dropped)
+
+    if flagged:
+        reasons = (
+            df.filter(~F.col("quality_ok"))
+            .select(F.explode(F.split("dq_observations", ";")).alias("reason"))
+            .groupBy("reason")
+            .count()
+            .collect()
+        )
+        for row in sorted(reasons, key=lambda r: r["reason"]):
+            log.info("  quality - %s: %d", row["reason"], row["count"])
+
+    log.info(
+        "Transform finished - %d in staging, %d flagged for quality",
+        total_out,
+        flagged,
+    )
+    return {
+        "layer": "staging",
+        "path": destination,
+        "records_in": total_in,
+        "records_out": total_out,
+        "records_flagged": flagged,
+    }
