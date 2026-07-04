@@ -91,11 +91,6 @@
             "example": "ativo"
         },
         {
-            "name": "source_file",
-            "type": "string",
-            "example": "/opt/airflow/data/motoristas/motoristas.json"
-        },
-        {
             "name": "ingested_at",
             "type": "timestamp",
             "example": "2026-07-02 12:44:15.126810"
