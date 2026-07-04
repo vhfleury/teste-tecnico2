@@ -183,6 +183,118 @@ def test_apply_table_validations_non_negative_flags_negative_values(spark):
     ]
 
 
+def test_apply_table_validations_positive_flags_zero_negative_and_null(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "raio_km",
+                "type": "double",
+                "validations": [{"check": "positive", "reason": "invalid_radius"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [("GEO-0001", 1.0), ("GEO-0002", 0.0), ("GEO-0003", -0.5), ("GEO-0004", None)],
+        "geocerca_id string, raio_km double",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # Unlike non_negative, zero is not a meaningful radius and is flagged.
+    assert [
+        (row["geocerca_id"], row["raio_km"], row["dq_observations"], row["quality_ok"])
+        for row in result
+    ] == [
+        ("GEO-0001", 1.0, "", True),
+        ("GEO-0002", None, "invalid_radius", False),
+        ("GEO-0003", None, "invalid_radius", False),
+        ("GEO-0004", None, "invalid_radius", False),
+    ]
+
+
+def test_apply_table_validations_geofence_type_check(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "tipo",
+                "type": "string",
+                "validations": [
+                    {"check": "geofence_type_is_valid", "reason": "invalid_geofence_type"}
+                ],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("GEO-0001", "centro_distribuicao"),
+            ("GEO-0002", "pedagio"),
+            ("GEO-0003", "posto_combustivel"),
+            ("GEO-0004", "cliente"),
+            ("GEO-0005", "garagem"),
+        ],
+        ["geocerca_id", "tipo"],
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    assert [
+        (row["geocerca_id"], row["tipo"], row["quality_ok"]) for row in result
+    ] == [
+        ("GEO-0001", "centro_distribuicao", True),
+        ("GEO-0002", "pedagio", True),
+        ("GEO-0003", "posto_combustivel", True),
+        ("GEO-0004", "cliente", True),
+        ("GEO-0005", None, False),
+    ]
+
+
+def test_apply_table_validations_geojson_polygon_check(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "geometry",
+                "type": "string",
+                "validations": [
+                    {"check": "geojson_polygon_is_valid", "reason": "invalid_geometry"}
+                ],
+            },
+        ],
+    }
+    valid = '{"type":"Polygon","coordinates":[[[-1.0,-2.0],[1.0,-2.0],[1.0,2.0],[-1.0,-2.0]]]}'
+    zeroed = '{"type":"Polygon","coordinates":[[[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0]]]}'
+    short_ring = '{"type":"Polygon","coordinates":[[[-1.0,-2.0],[1.0,-2.0],[-1.0,-2.0]]]}'
+    not_polygon = '{"type":"Point","coordinates":[[[-1.0,-2.0]]]}'
+    df = spark.createDataFrame(
+        [
+            ("GEO-0001", valid),
+            ("GEO-0002", zeroed),
+            ("GEO-0003", short_ring),
+            ("GEO-0004", not_polygon),
+            ("GEO-0005", "not a geojson"),
+            ("GEO-0006", None),
+        ],
+        "geocerca_id string, geometry string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # Null passes (presence is `required`'s job under its own reason);
+    # zeroed, degenerate, non-Polygon and unparseable geometries fail.
+    assert [
+        (row["geocerca_id"], row["geometry"], row["quality_ok"]) for row in result
+    ] == [
+        ("GEO-0001", valid, True),
+        ("GEO-0002", None, False),
+        ("GEO-0003", None, False),
+        ("GEO-0004", None, False),
+        ("GEO-0005", None, False),
+        ("GEO-0006", None, True),
+    ]
+
+
 def test_apply_table_validations_fails_on_unknown_check(spark):
     config = {
         "table_name": "staging_example",

@@ -1,0 +1,88 @@
+{
+    "table_name": "staging_geocercas",
+    "description": "Geofence registry flattened, cleaned and validated (staging layer)",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "geocerca_id",
+            "type": "string",
+            "key": true,
+            "treatments": ["trim", "normalize"],
+            "example": "GEO-0001"
+        },
+        {
+            "name": "nome",
+            "type": "string",
+            "treatments": ["trim"],
+            "validations": [
+                {"check": "required", "reason": "missing_name"}
+            ],
+            "example": "CD São Paulo - Guarulhos"
+        },
+        {
+            "name": "tipo",
+            "type": "string",
+            "treatments": ["trim", "lowercase"],
+            "validations": [
+                {"check": "geofence_type_is_valid", "reason": "invalid_geofence_type"}
+            ],
+            "example": ["centro_distribuicao", "pedagio", "posto_combustivel", "cliente"]
+        },
+        {
+            "name": "uf",
+            "type": "string",
+            "treatments": ["trim", "normalize"],
+            "example": "SP"
+        },
+        {
+            "name": "raio_km",
+            "type": "double",
+            "validations": [
+                {"check": "positive", "reason": "invalid_radius"}
+            ],
+            "example": 1.0
+        },
+        {
+            "name": "ativo",
+            "type": "boolean",
+            "validations": [
+                {"check": "required", "reason": "invalid_active_flag"}
+            ],
+            "example": true
+        },
+        {
+            "name": "geometry",
+            "type": "string",
+            "validations": [
+                {"check": "required", "reason": "missing_geometry"},
+                {"check": "geojson_polygon_is_valid", "reason": "invalid_geometry"}
+            ],
+            "example": "{\"type\":\"Polygon\",\"coordinates\":[[[-46.4731,-23.426617],[-46.47119,-23.426789]]]}"
+        },
+        {
+            "name": "source_file",
+            "type": "string",
+            "example": "/opt/airflow/data/geocercas/geocercas.geojson"
+        },
+        {
+            "name": "ingested_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:00:00.000000"
+        },
+        {
+            "name": "dq_observations",
+            "type": "string",
+            "example": "invalid_radius;missing_geometry"
+        },
+        {
+            "name": "quality_ok",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00.000000"
+        }
+    ]
+}
