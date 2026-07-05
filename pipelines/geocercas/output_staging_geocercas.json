@@ -3,7 +3,7 @@
         {
             "geocerca_id": "GEO-0001",
             "nome": "CD São Paulo - Guarulhos",
-            "tipo": "centro_distribuicao",
+            "tipo": "CENTRO_DISTRIBUICAO",
             "uf": "SP",
             "raio_km": 1.0,
             "ativo": true,
@@ -17,7 +17,7 @@
         {
             "geocerca_id": "GEO-9001",
             "nome": "Cliente Raio Negativo",
-            "tipo": "cliente",
+            "tipo": "CLIENTE",
             "uf": "MG",
             "raio_km": null,
             "ativo": true,
@@ -31,7 +31,7 @@
         {
             "geocerca_id": "GEO-9004",
             "nome": "Cliente Sem Geometria",
-            "tipo": "cliente",
+            "tipo": "CLIENTE",
             "uf": "BA",
             "raio_km": 0.5,
             "ativo": true,

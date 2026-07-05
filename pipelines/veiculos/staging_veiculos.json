@@ -7,13 +7,13 @@
             "name": "veiculo_id",
             "type": "string",
             "key": true,
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "VEI-0001"
         },
         {
             "name": "placa",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "plate_is_valid", "reason": "invalid_plate"}
             ],
@@ -22,13 +22,13 @@
         {
             "name": "marca",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "VOLVO"
         },
         {
             "name": "modelo",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "VM 270"
         },
         {
@@ -66,11 +66,11 @@
         {
             "name": "status",
             "type": "string",
-            "treatments": ["trim", "lowercase"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "vehicle_status_is_valid", "reason": "invalid_status"}
             ],
-            "example": ["ativo", "em_manutencao"]
+            "example": ["ATIVO", "EM_MANUTENCAO"]
         },
         {
             "name": "data_ultima_revisao",

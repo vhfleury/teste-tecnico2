@@ -7,31 +7,31 @@
             "name": "viagem_id",
             "type": "string",
             "key": true,
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "VIA-000001"
         },
         {
             "name": "veiculo_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "VEI-0062"
         },
         {
             "name": "motorista_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "MOT-0054"
         },
         {
             "name": "geocerca_origem_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "GEO-0005"
         },
         {
             "name": "geocerca_destino_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "GEO-0027"
         },
         {
@@ -55,11 +55,11 @@
         {
             "name": "status",
             "type": "string",
-            "treatments": ["trim", "lowercase"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "trip_status_is_valid", "reason": "invalid_status"}
             ],
-            "example": ["concluida", "em_transito", "cancelada", "atrasada"]
+            "example": ["CONCLUIDA", "EM_TRANSITO", "CANCELADA", "ATRASADA"]
         },
         {
             "name": "distancia_km",
@@ -80,7 +80,7 @@
         {
             "name": "nota_fiscal",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "required", "reason": "missing_invoice"}
             ],

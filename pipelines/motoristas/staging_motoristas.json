@@ -7,13 +7,13 @@
             "name": "motorista_id",
             "type": "string",
             "key": true,
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "MOT-0002"
         },
         {
             "name": "nome",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "required", "reason": "missing_name"}
             ],
@@ -47,7 +47,7 @@
         {
             "name": "categoria_cnh",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "cnh_category_is_valid", "reason": "invalid_cnh_category"}
             ],
@@ -84,7 +84,7 @@
         {
             "name": "status",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "driver_status_is_valid", "reason": "invalid_status"}
             ],
