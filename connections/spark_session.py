@@ -1,7 +1,11 @@
 """Factory for local SparkSession instances used by the pipelines."""
 from __future__ import annotations
 
+import logging
+
 from pyspark.sql import SparkSession
+
+log = logging.getLogger(__name__)
 
 
 def get_spark(
@@ -33,6 +37,9 @@ def get_spark(
         .master(master)
         .config("spark.sql.shuffle.partitions", "4")
         .config("spark.sql.session.timeZone", "UTC")
+        # Ephemeral per-task sessions need no UI; disabling it also stops
+        # concurrent tasks from fighting over ports 4040+.
+        .config("spark.ui.enabled", "false")
         .config("spark.ui.showConsoleProgress", "false")
     )
     if enable_delta:
@@ -63,9 +70,11 @@ def run_spark(app_name: str, function, *args, enable_delta: bool = False):
     Returns:
         Whatever `function` returns.
     """
+    log.info("Creating SparkSession '%s' (enable_delta=%s)", app_name, enable_delta)
     spark = get_spark(app_name, enable_delta=enable_delta)
     try:
         result = function(spark, *args)
     finally:
         spark.stop()
+        log.info("SparkSession '%s' stopped", app_name)
     return result
