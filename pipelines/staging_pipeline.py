@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import os
 from copy import deepcopy
-from typing import Any
+from typing import Any, Callable
 
 from data_quality.quality_report import report_quality_partition, split_by_quality
 from data_quality.validation import apply_table_validations, enforce_table_config
@@ -210,39 +210,58 @@ def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
     return df.withColumn("processed_at", F.current_timestamp())
 
 
-def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> dict:
-    """Read raw, apply the source table config and write staging.
+def run_staging_transform(
+    spark: SparkSession,
+    source: str,
+    ingest_date: str,
+    *,
+    raw_dir: str,
+    staging_dir: str,
+    quarantine_dir: str,
+    config_path: str,
+    clean: Callable[[DataFrame, dict], DataFrame],
+) -> dict:
+    """Run the shared raw -> staging transform flow for one source.
+
+    Single implementation of the staging write, consumed by the
+    generic `transform_to_staging` and by pipelines with exclusive
+    treatment (e.g. geocercas): read the raw partition, apply the
+    source's ``clean`` chain, enforce the table config, split by
+    ``quality_ok`` and write the staging (approved) and quarantine
+    (rejected) partitions with their processed markers.
 
     Args:
         spark: Active SparkSession (must be created with
             ``enable_delta=True``).
-        source: Source name registered in ``STAGING_SOURCES``.
-        ingest_date: Ingestion date in ``YYYY-MM-DD`` format, used
-            to locate raw and staging partitions.
-
-    Only rows with ``quality_ok`` True are written to staging;
-    rejected rows go to the quarantine layer with their
-    ``dq_observations`` reasons, so downstream consumers never see an
-    inconsistent record.
+        source: Source name, used for logging and metrics.
+        ingest_date: Ingestion date in ``YYYY-MM-DD`` format, used to
+            locate raw and to partition staging/quarantine.
+        raw_dir: Base directory of the source's raw table.
+        staging_dir: Base directory of the source's staging table.
+        quarantine_dir: Base directory of the source's quarantine
+            table.
+        config_path: Path to the table config JSON (the staging
+            contract).
+        clean: The source's treatment chain, invoked as
+            ``clean(raw, config)``.
 
     Returns:
         Metrics about the write: layer name, destination table,
         ingestion date, input/output record counts and how many were
         quarantined.
     """
-    raw_source = raw_dir_for(source)
     log.info(
         "Starting transform for %s - reading raw layer from %s (ingest_date=%s)",
         source,
-        raw_source,
+        raw_dir,
         ingest_date,
     )
-    raw = read_delta_partition(spark, raw_source, ingest_date)
+    raw = read_delta_partition(spark, raw_dir, ingest_date)
     total_in = raw.count()
     log.info("Raw layer read for %s: %d records", source, total_in)
 
-    config = load_table_config(table_config_path(source))
-    df = clean_and_validate(raw, config)
+    config = load_table_config(config_path)
+    df = clean(raw, config)
     df = enforce_table_config(df, config)
     log.info(
         "Treatments applied and schema validated against table config '%s'",
@@ -250,16 +269,14 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
     )
 
     approved, rejected = split_by_quality(df)
-    destination = staging_dir_for(source)
-    quarantine_destination = quarantine_dir_for(source)
 
-    log.info("Writing staging layer for %s to %s (Delta)", source, destination)
-    write_delta_partition(approved, destination, ingest_date)
-    mark_delta_partition_processed(destination, ingest_date)
+    log.info("Writing staging layer for %s to %s (Delta)", source, staging_dir)
+    write_delta_partition(approved, staging_dir, ingest_date)
+    mark_delta_partition_processed(staging_dir, ingest_date)
 
-    log.info("Writing quarantine layer for %s to %s (Delta)", source, quarantine_destination)
-    write_delta_partition(rejected, quarantine_destination, ingest_date)
-    mark_delta_partition_processed(quarantine_destination, ingest_date)
+    log.info("Writing quarantine layer for %s to %s (Delta)", source, quarantine_dir)
+    write_delta_partition(rejected, quarantine_dir, ingest_date)
+    mark_delta_partition_processed(quarantine_dir, ingest_date)
 
     total_out = approved.count()
     quarantined = rejected.count()
@@ -277,12 +294,44 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
     return {
         "layer": "staging",
         "source": source,
-        "path": destination,
+        "path": staging_dir,
         "ingest_date": ingest_date,
         "records_in": total_in,
         "records_out": total_out,
         "records_quarantined": quarantined,
     }
+
+
+def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> dict:
+    """Read raw, apply the source table config and write staging.
+
+    Only rows with ``quality_ok`` True are written to staging;
+    rejected rows go to the quarantine layer with their
+    ``dq_observations`` reasons, so downstream consumers never see an
+    inconsistent record.
+
+    Args:
+        spark: Active SparkSession (must be created with
+            ``enable_delta=True``).
+        source: Source name registered in ``STAGING_SOURCES``.
+        ingest_date: Ingestion date in ``YYYY-MM-DD`` format, used
+            to locate raw and staging partitions.
+
+    Returns:
+        Metrics about the write: layer name, destination table,
+        ingestion date, input/output record counts and how many were
+        quarantined.
+    """
+    return run_staging_transform(
+        spark,
+        source,
+        ingest_date,
+        raw_dir=raw_dir_for(source),
+        staging_dir=staging_dir_for(source),
+        quarantine_dir=quarantine_dir_for(source),
+        config_path=table_config_path(source),
+        clean=clean_and_validate,
+    )
 
 
 def report_data_quality(spark: SparkSession, source: str, ingest_date: str) -> dict:

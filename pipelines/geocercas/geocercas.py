@@ -18,22 +18,21 @@ from __future__ import annotations
 import logging
 import os
 
-from data_quality.quality_report import report_quality_partition, split_by_quality
-from data_quality.validation import apply_table_validations, enforce_table_config
+from data_quality.quality_report import report_quality_partition
+from data_quality.validation import apply_table_validations
 from general.delta_io import (
     mark_delta_partition_processed,
-    read_delta_partition,
     write_delta_partition,
 )
 from general.utils import (
     DATA_DIR,
     layer_dir,
-    load_table_config,
 )
 from parser.treatment import apply_derived_columns, apply_table_treatments
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType
+from staging_pipeline import run_staging_transform
 
 log = logging.getLogger(__name__)
 
@@ -185,6 +184,11 @@ def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
 def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
     """Read the raw layer, clean/validate it and write staging.
 
+    Delegates to the shared staging transform
+    (`staging_pipeline.run_staging_transform`) with this source's
+    paths and its exclusive `clean_and_validate` chain (GeoJSON
+    flattening before the generic engine).
+
     Args:
         spark: Active SparkSession (must be created with
             ``enable_delta=True``).
@@ -192,65 +196,21 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
             to locate the raw partition and to partition the
             staging layer.
 
-    Only rows with ``quality_ok`` True are written to staging;
-    rejected rows go to the quarantine layer with their
-    ``dq_observations`` reasons, so downstream consumers never see an
-    inconsistent record.
-
     Returns:
         Metrics about the write: layer name, destination table,
         ingestion date, input/output record counts and how many were
         quarantined.
     """
-    log.info(
-        "Starting transform - reading raw layer from %s (ingest_date=%s)",
-        RAW_DIR,
+    return run_staging_transform(
+        spark,
+        SOURCE,
         ingest_date,
+        raw_dir=RAW_DIR,
+        staging_dir=STAGING_DIR,
+        quarantine_dir=QUARANTINE_DIR,
+        config_path=TABLE_CONFIG,
+        clean=clean_and_validate,
     )
-    raw = read_delta_partition(spark, RAW_DIR, ingest_date)
-    total_in = raw.count()
-    log.info("Raw layer read: %d records", total_in)
-
-    # The table config is the staging contract: declared treatments and
-    # validations are applied and wrong columns/types abort the write.
-    config = load_table_config(TABLE_CONFIG)
-    df = clean_and_validate(raw, config)
-    df = enforce_table_config(df, config)
-    log.info(
-        "Treatments applied and schema validated against table config '%s'",
-        config["table_name"],
-    )
-
-    approved, rejected = split_by_quality(df)
-
-    log.info("Writing staging layer to %s (Delta)", STAGING_DIR)
-    write_delta_partition(approved, STAGING_DIR, ingest_date)
-    mark_delta_partition_processed(STAGING_DIR, ingest_date)
-
-    log.info("Writing quarantine layer to %s (Delta)", QUARANTINE_DIR)
-    write_delta_partition(rejected, QUARANTINE_DIR, ingest_date)
-    mark_delta_partition_processed(QUARANTINE_DIR, ingest_date)
-
-    total_out = approved.count()
-    quarantined = rejected.count()
-
-    dropped = total_in - total_out - quarantined
-    if dropped:
-        log.info("%d record(s) dropped (missing key or duplicate)", dropped)
-
-    log.info(
-        "Transform finished - %d in staging, %d quarantined",
-        total_out,
-        quarantined,
-    )
-    return {
-        "layer": "staging",
-        "path": STAGING_DIR,
-        "ingest_date": ingest_date,
-        "records_in": total_in,
-        "records_out": total_out,
-        "records_quarantined": quarantined,
-    }
 
 
 def report_data_quality(spark: SparkSession, ingest_date: str) -> dict:
