@@ -4,9 +4,12 @@ This module owns the shared raw -> staging flow for declarative
 sources. Source-specific rules stay in ``staging_<source>.json``;
 this runner only knows how to read each raw input format, add runtime
 metadata, apply the generic treatment/validation engine and write the
-staging partition. Both layers are Delta tables: every write replaces
-only its own ``ingest_date`` partition and sets the processed marker
-right after the commit.
+staging partition. Rows that fail validation (``quality_ok`` False)
+never reach staging: they are written to the quarantine layer and
+reported by ``report_data_quality`` (the ``data_quality`` DAG task).
+All layers are Delta tables: every write replaces only its own
+``ingest_date`` partition and sets the processed marker right after
+the commit.
 """
 from __future__ import annotations
 
@@ -15,6 +18,7 @@ import os
 from copy import deepcopy
 from typing import Any
 
+from data_quality.quality_report import report_quality_partition, split_by_quality
 from data_quality.validation import apply_table_validations, enforce_table_config
 from general.delta_io import (
     mark_delta_partition_processed,
@@ -116,6 +120,12 @@ def staging_dir_for(source: str) -> str:
     return layer_dir("staging", source)
 
 
+def quarantine_dir_for(source: str) -> str:
+    """Build the quarantine layer base directory for a registered source."""
+    get_source_config(source)
+    return layer_dir("quarantine", source)
+
+
 def table_config_path(source: str) -> str:
     """Build the staging table config path for a registered source."""
     get_source_config(source)
@@ -210,10 +220,15 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
         ingest_date: Ingestion date in ``YYYY-MM-DD`` format, used
             to locate raw and staging partitions.
 
+    Only rows with ``quality_ok`` True are written to staging;
+    rejected rows go to the quarantine layer with their
+    ``dq_observations`` reasons, so downstream consumers never see an
+    inconsistent record.
+
     Returns:
         Metrics about the write: layer name, destination table,
         ingestion date, input/output record counts and how many were
-        flagged for quality.
+        quarantined.
     """
     raw_source = raw_dir_for(source)
     log.info(
@@ -234,34 +249,30 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
         config["table_name"],
     )
 
+    approved, rejected = split_by_quality(df)
     destination = staging_dir_for(source)
+    quarantine_destination = quarantine_dir_for(source)
+
     log.info("Writing staging layer for %s to %s (Delta)", source, destination)
-    write_delta_partition(df, destination, ingest_date)
+    write_delta_partition(approved, destination, ingest_date)
     mark_delta_partition_processed(destination, ingest_date)
 
-    total_out = df.count()
-    flagged = df.filter(~F.col("quality_ok")).count()
+    log.info("Writing quarantine layer for %s to %s (Delta)", source, quarantine_destination)
+    write_delta_partition(rejected, quarantine_destination, ingest_date)
+    mark_delta_partition_processed(quarantine_destination, ingest_date)
 
-    dropped = total_in - total_out
+    total_out = approved.count()
+    quarantined = rejected.count()
+
+    dropped = total_in - total_out - quarantined
     if dropped:
         log.info("%d record(s) dropped for %s (missing key or duplicate)", dropped, source)
 
-    if flagged:
-        reasons = (
-            df.filter(~F.col("quality_ok"))
-            .select(F.explode(F.split("dq_observations", ";")).alias("reason"))
-            .groupBy("reason")
-            .count()
-            .collect()
-        )
-        for row in sorted(reasons, key=lambda item: item["reason"]):
-            log.info("  quality - %s: %d", row["reason"], row["count"])
-
     log.info(
-        "Transform finished for %s - %d in staging, %d flagged for quality",
+        "Transform finished for %s - %d in staging, %d quarantined",
         source,
         total_out,
-        flagged,
+        quarantined,
     )
     return {
         "layer": "staging",
@@ -270,5 +281,32 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
         "ingest_date": ingest_date,
         "records_in": total_in,
         "records_out": total_out,
-        "records_flagged": flagged,
+        "records_quarantined": quarantined,
     }
+
+
+def report_data_quality(spark: SparkSession, source: str, ingest_date: str) -> dict:
+    """Log the data-quality alert for a source's quarantined partition.
+
+    Backs the ``data_quality`` DAG task, which runs after
+    ``transform_to_staging``: reads the partition's staging and
+    quarantine tables and logs how many records were rejected, the
+    reason counts and the percentage over the total.
+
+    Args:
+        spark: Active SparkSession (must be created with
+            ``enable_delta=True``).
+        source: Source name registered in ``STAGING_SOURCES``.
+        ingest_date: Ingestion date in ``YYYY-MM-DD`` format.
+
+    Returns:
+        Metrics about the partition: total/rejected record counts,
+        rejected percentage and count per reason.
+    """
+    return report_quality_partition(
+        spark,
+        source,
+        staging_dir_for(source),
+        quarantine_dir_for(source),
+        ingest_date,
+    )
