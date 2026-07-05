@@ -8,15 +8,14 @@ One stage, one task:
   analytics layer.
 
 Staging standardized the FORM of both inputs; this module applies the
-SEMANTICS: point-in-polygon matching, location classification
-(`em_geocerca` / `em_rota`) and geofence entry/exit events along each
-trip. Joins and business rules live here in code — the table config
-declares only names and types. Every join is a LEFT JOIN from the
-fact (positions), so no row is ever dropped.
+SEMANTICS: point-in-polygon matching via Apache Sedona, location
+classification (`em_geocerca` / `em_rota`) and geofence entry/exit
+events along each trip. Joins and business rules live here in code —
+the table config declares only names and types. Every join is a LEFT
+JOIN from the fact (positions), so no row is ever dropped.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 
@@ -26,9 +25,12 @@ from general.utils import (
     load_table_config,
     partition_path,
 )
-from pyspark.sql import DataFrame, SparkSession, Window
+from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
-from pyspark.sql.types import BooleanType, DoubleType, StructField, StructType
+from pyspark.sql.types import ArrayType, DoubleType, StringType, StructField, StructType
+from sedona.spark import SedonaContext
+from sedona.spark.sql import st_constructors as stc
+from sedona.spark.sql import st_predicates as stp
 
 log = logging.getLogger(__name__)
 
@@ -42,194 +44,65 @@ ANALYTICS_DIR = layer_dir("analytics", SOURCE)
 # Table config (contract) of the analytics table written by this module.
 TABLE_CONFIG = os.path.join(os.path.dirname(__file__), f"analytics_{SOURCE}.json")
 
-# Return type of the `polygon_bounds` UDF: the bounding box of a geofence
-# polygon, used to prefilter join candidates before the exact
-# point-in-polygon check.
-GEOFENCE_BOUNDS_SCHEMA = StructType(
+# Structural shape of a serialized GeoJSON Polygon, used by `from_json`
+# to pre-validate geometries: Sedona's ST_GeomFromGeoJSON raises on
+# malformed input, so only geometries that pass this check reach it —
+# one bad geofence never crashes the whole partition.
+GEOJSON_POLYGON_SCHEMA = StructType(
     [
-        StructField("min_longitude", DoubleType()),
-        StructField("max_longitude", DoubleType()),
-        StructField("min_latitude", DoubleType()),
-        StructField("max_latitude", DoubleType()),
+        StructField("type", StringType()),
+        StructField("coordinates", ArrayType(ArrayType(ArrayType(DoubleType())))),
     ]
 )
 
 
-def _extract_outer_ring(geometry: str | None) -> list[tuple[float, float]] | None:
-    """Parse the outer ring from a serialized GeoJSON Polygon.
+def _is_valid_geojson_polygon(geometry: Column) -> Column:
+    """Build a predicate that structurally validates a GeoJSON Polygon.
 
-    Defensive by design: any malformed geometry (unparseable JSON,
-    missing coordinates, non-numeric point, ring with fewer than 4
-    points) yields None instead of raising, so one bad geofence never
-    crashes the whole partition.
-
-    Args:
-        geometry: GeoJSON Polygon serialized as a JSON string, as
-            canonicalized by the geocercas staging.
-
-    Returns:
-        The outer ring as (longitude, latitude) tuples, or None when
-        the geometry is absent or malformed.
-    """
-    if not geometry:
-        return None
-    try:
-        parsed = json.loads(geometry)
-        coordinates = parsed.get("coordinates") or []
-        ring = coordinates[0]
-    except (TypeError, ValueError, IndexError, KeyError):
-        return None
-
-    points = []
-    for point in ring:
-        if not isinstance(point, list | tuple) or len(point) < 2:
-            return None
-        try:
-            longitude = float(point[0])
-            latitude = float(point[1])
-        except (TypeError, ValueError):
-            return None
-        points.append((longitude, latitude))
-    if len(points) < 4:
-        return None
-    return points
-
-
-def _point_is_on_segment(
-    point_longitude: float,
-    point_latitude: float,
-    start_longitude: float,
-    start_latitude: float,
-    end_longitude: float,
-    end_latitude: float,
-) -> bool:
-    """Check whether a point lies exactly on a polygon edge.
-
-    Boundary points are checked apart from the ray casting because the
-    crossing count is ambiguous on edges; the matcher treats them as
-    inside.
+    Defensive by design: unparseable JSON, wrong geometry type, missing
+    coordinates, non-numeric points, rings with fewer than 4 points or
+    unclosed rings are all flagged invalid instead of raising, so the
+    matcher can exclude them before Sedona parses the geometry.
 
     Args:
-        point_longitude: Longitude of the GPS point.
-        point_latitude: Latitude of the GPS point.
-        start_longitude: Longitude of the edge start vertex.
-        start_latitude: Latitude of the edge start vertex.
-        end_longitude: Longitude of the edge end vertex.
-        end_latitude: Latitude of the edge end vertex.
+        geometry: Column with the GeoJSON Polygon serialized as a JSON
+            string, as canonicalized by the geocercas staging.
 
     Returns:
-        True when the point is collinear with the edge and inside its
-        bounding box.
+        Boolean Column, true only for structurally valid polygons.
     """
-    cross_product = (
-        (point_latitude - start_latitude) * (end_longitude - start_longitude)
-        - (point_longitude - start_longitude) * (end_latitude - start_latitude)
+    parsed = F.from_json(geometry, GEOJSON_POLYGON_SCHEMA)
+    outer_ring = parsed["coordinates"].getItem(0)
+    has_valid_points = ~F.exists(
+        outer_ring,
+        lambda point: point.isNull() | point.getItem(0).isNull() | point.getItem(1).isNull(),
     )
-    if abs(cross_product) > 1e-9:
-        return False
-    within_longitude = min(start_longitude, end_longitude) <= point_longitude <= max(
-        start_longitude, end_longitude
+    is_closed_ring = F.element_at(outer_ring, 1) == F.element_at(outer_ring, -1)
+    return (
+        parsed.isNotNull()
+        & (parsed["type"] == F.lit("Polygon"))
+        & outer_ring.isNotNull()
+        & (F.size(outer_ring) >= F.lit(4))
+        & has_valid_points
+        & is_closed_ring
     )
-    within_latitude = min(start_latitude, end_latitude) <= point_latitude <= max(
-        start_latitude, end_latitude
-    )
-    return within_longitude and within_latitude
-
-
-def _point_is_inside_geojson_polygon(
-    latitude: float | None,
-    longitude: float | None,
-    geometry: str | None,
-) -> bool:
-    """Check if a GPS point is inside a serialized GeoJSON Polygon.
-
-    Ray casting over the outer ring: a horizontal ray from the point
-    crosses the polygon edges an odd number of times when the point is
-    inside. Points exactly on an edge count as inside. Null
-    coordinates and malformed geometries are outside — quarantined
-    positions stay `em_rota` instead of failing the job.
-
-    Args:
-        latitude: Latitude of the GPS point.
-        longitude: Longitude of the GPS point.
-        geometry: GeoJSON Polygon serialized as a JSON string.
-
-    Returns:
-        True when the point is inside (or on the boundary of) the
-        polygon.
-    """
-    if latitude is None or longitude is None:
-        return False
-    ring = _extract_outer_ring(geometry)
-    if not ring:
-        return False
-
-    inside = False
-    point_longitude = float(longitude)
-    point_latitude = float(latitude)
-    for index, (start_longitude, start_latitude) in enumerate(ring):
-        end_longitude, end_latitude = ring[(index + 1) % len(ring)]
-        if _point_is_on_segment(
-            point_longitude,
-            point_latitude,
-            start_longitude,
-            start_latitude,
-            end_longitude,
-            end_latitude,
-        ):
-            return True
-        crosses_ray = (start_latitude > point_latitude) != (end_latitude > point_latitude)
-        if crosses_ray:
-            intersection_longitude = start_longitude + (
-                (point_latitude - start_latitude)
-                * (end_longitude - start_longitude)
-                / (end_latitude - start_latitude)
-            )
-            if point_longitude < intersection_longitude:
-                inside = not inside
-    return inside
-
-
-def _geojson_polygon_bounds(geometry: str | None) -> tuple[float, float, float, float] | None:
-    """Return bounding-box coordinates for a serialized GeoJSON Polygon.
-
-    Args:
-        geometry: GeoJSON Polygon serialized as a JSON string.
-
-    Returns:
-        (min_longitude, max_longitude, min_latitude, max_latitude), or
-        None when the geometry is absent or malformed.
-    """
-    ring = _extract_outer_ring(geometry)
-    if not ring:
-        return None
-    longitudes = [point[0] for point in ring]
-    latitudes = [point[1] for point in ring]
-    return (min(longitudes), max(longitudes), min(latitudes), max(latitudes))
-
-
-# The geometry math is plain Python (json + arithmetic), so it runs as
-# UDFs: bounds once per geofence, point-in-polygon only on the
-# candidates that pass the bounding-box prefilter.
-point_in_polygon = F.udf(_point_is_inside_geojson_polygon, BooleanType())
-polygon_bounds = F.udf(_geojson_polygon_bounds, GEOFENCE_BOUNDS_SCHEMA)
 
 
 def _active_geofences(geofences: DataFrame) -> DataFrame:
     """Prepare active, quality-approved geofences for spatial matching.
 
     Only geofences that passed staging quality, are active and carry a
-    geometry can contain a position; their bounding box is precomputed
-    here so the join prefilter compares plain columns. Geofences whose
-    geometry yields no bounds (malformed) are excluded from matching —
-    they cannot contain any point.
+    structurally valid geometry can contain a position; the GeoJSON is
+    parsed once here into a Sedona geometry. Geofences with malformed
+    geometry are excluded from matching — they cannot contain any
+    point.
 
     Args:
         geofences: Staging geofences DataFrame.
 
     Returns:
         One row per matchable geofence with the renamed geocerca_*
-        columns, the canonical geometry and its bounding box.
+        columns and the parsed Sedona geometry.
     """
     return (
         geofences.filter(
@@ -237,18 +110,13 @@ def _active_geofences(geofences: DataFrame) -> DataFrame:
             & (F.col("ativo") == F.lit(True))
             & F.col("geometry").isNotNull()
         )
-        .withColumn("bounds", polygon_bounds("geometry"))
-        .filter(F.col("bounds").isNotNull())
+        .filter(_is_valid_geojson_polygon(F.col("geometry")))
         .select(
             "geocerca_id",
             F.col("nome").alias("geocerca_nome"),
             F.col("tipo").alias("geocerca_tipo"),
             F.col("raio_km").alias("geocerca_raio_km"),
-            "geometry",
-            F.col("bounds.min_longitude").alias("min_longitude"),
-            F.col("bounds.max_longitude").alias("max_longitude"),
-            F.col("bounds.min_latitude").alias("min_latitude"),
-            F.col("bounds.max_latitude").alias("max_latitude"),
+            stc.ST_GeomFromGeoJSON("geometry").alias("geofence_geometry"),
         )
     )
 
@@ -281,18 +149,21 @@ def _position_base(positions: DataFrame) -> DataFrame:
 def match_positions_to_geofences(positions: DataFrame, geofences: DataFrame) -> DataFrame:
     """Left-enrich each position with the best containing geofence, if any.
 
-    Two-step spatial match, cheap filter first:
+    The spatial match is delegated to Apache Sedona:
 
-    1. Bounding-box prefilter — broadcast join of the positions
-       against the (small) geofence table on plain column
-       comparisons, so the UDF never runs on the full cross product.
-    2. Exact check — the point-in-polygon UDF confirms each candidate;
-       ties (overlapping geofences) are broken by the smallest radius,
-       then by geofence id, keeping exactly one match per position.
+    1. Each position with coordinates becomes an ``ST_Point`` and each
+       matchable geofence a Sedona geometry (``ST_GeomFromGeoJSON``).
+    2. ``ST_Intersects`` joins the points against the (small,
+       broadcast) geofence table — Sedona plans an indexed spatial
+       join, replacing the manual bounding-box prefilter. Boundary
+       points intersect their polygon, so they count as inside. Ties
+       (overlapping geofences) are broken by the smallest radius, then
+       by geofence id, keeping exactly one match per position.
 
     The join back to the positions is a LEFT JOIN from the fact:
-    positions without a containing geofence keep null geocerca_*
-    columns and no row is ever dropped.
+    positions without a containing geofence (including quarantined
+    rows with null coordinates) keep null geocerca_* columns and no
+    row is ever dropped.
 
     Args:
         positions: Staging positions DataFrame.
@@ -303,39 +174,21 @@ def match_positions_to_geofences(positions: DataFrame, geofences: DataFrame) -> 
         and `geocerca_tipo` (null when no geofence contains the
         position).
     """
+    SedonaContext.create(positions.sparkSession)
     position_base = _position_base(positions)
     geofence_base = _active_geofences(geofences)
 
-    join_condition = (
-        F.col("p.latitude").isNotNull()
-        & F.col("p.longitude").isNotNull()
-        & (F.col("p.latitude") >= F.col("g.min_latitude"))
-        & (F.col("p.latitude") <= F.col("g.max_latitude"))
-        & (F.col("p.longitude") >= F.col("g.min_longitude"))
-        & (F.col("p.longitude") <= F.col("g.max_longitude"))
+    position_points = position_base.filter(
+        F.col("latitude").isNotNull() & F.col("longitude").isNotNull()
+    ).select(
+        "posicao_id",
+        stc.ST_Point("longitude", "latitude").alias("position_point"),
     )
-    candidates = position_base.alias("p").join(
-        F.broadcast(geofence_base).alias("g"),
-        join_condition,
-        "left",
-    )
-    matches = (
-        candidates.withColumn(
-            "is_inside_geofence",
-            F.when(
-                F.col("g.geocerca_id").isNotNull(),
-                point_in_polygon(F.col("p.latitude"), F.col("p.longitude"), F.col("g.geometry")),
-            ).otherwise(F.lit(False)),
-        )
-        .filter(F.col("is_inside_geofence"))
-        .select(
-            F.col("p.posicao_id").alias("posicao_id"),
-            F.col("g.geocerca_id").alias("geocerca_id"),
-            F.col("g.geocerca_nome").alias("geocerca_nome"),
-            F.col("g.geocerca_tipo").alias("geocerca_tipo"),
-            F.col("g.geocerca_raio_km").alias("geocerca_raio_km"),
-        )
-    )
+    matches = position_points.join(
+        F.broadcast(geofence_base),
+        stp.ST_Intersects(F.col("geofence_geometry"), F.col("position_point")),
+        "inner",
+    ).select("posicao_id", "geocerca_id", "geocerca_nome", "geocerca_tipo", "geocerca_raio_km")
 
     match_window = Window.partitionBy("posicao_id").orderBy(
         F.col("geocerca_raio_km").asc_nulls_last(),

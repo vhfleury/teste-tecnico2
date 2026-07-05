@@ -1,3 +1,4 @@
 pyspark==3.5.3
 delta-spark==3.3.2
+apache-sedona==1.9.0
 pytest
