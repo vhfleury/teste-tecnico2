@@ -1,0 +1,42 @@
+{
+    "table_name": "analytics_tempo_medio_por_rota",
+    "description": "Average trip duration per route (origin -> destination geofence). Routes with a null origin or destination id are excluded; tempo_medio_horas averages only trips with an actual duration (data_inicio and data_fim_real present), while total_viagens counts every trip on the route. Aggregated grain, so only the processed_at control column applies.",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "geocerca_origem_id",
+            "type": "string",
+            "example": "GEO-0005"
+        },
+        {
+            "name": "geocerca_destino_id",
+            "type": "string",
+            "example": "GEO-0027"
+        },
+        {
+            "name": "origem_nome",
+            "type": "string",
+            "example": "CD Sao Paulo - Guarulhos"
+        },
+        {
+            "name": "destino_nome",
+            "type": "string",
+            "example": "Cliente Rio de Janeiro - Centro"
+        },
+        {
+            "name": "tempo_medio_horas",
+            "type": "double",
+            "example": 14.75
+        },
+        {
+            "name": "total_viagens",
+            "type": "bigint",
+            "example": 8
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00"
+        }
+    ]
+}

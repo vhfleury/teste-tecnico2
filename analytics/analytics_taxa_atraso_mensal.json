@@ -1,0 +1,32 @@
+{
+    "table_name": "analytics_taxa_atraso_mensal",
+    "description": "Monthly delay rate: delayed trips / total trips. A trip counts as delayed via atrasada_flag from analytics_viagens_enriquecidas (explicit 'atrasada' status OR actual end after the planned end). mes = month of data_inicio; trips without a start date are excluded. Aggregated grain, so only the processed_at control column applies.",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "mes",
+            "type": "string",
+            "example": "2026-04"
+        },
+        {
+            "name": "viagens_atrasadas",
+            "type": "bigint",
+            "example": 12
+        },
+        {
+            "name": "viagens_total",
+            "type": "bigint",
+            "example": 42
+        },
+        {
+            "name": "taxa_atraso",
+            "type": "double",
+            "example": 0.2857
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00"
+        }
+    ]
+}

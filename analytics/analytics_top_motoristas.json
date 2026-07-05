@@ -1,0 +1,32 @@
+{
+    "table_name": "analytics_top_motoristas",
+    "description": "Top 10 drivers by completed trips. Ties break deterministically by motorista_id ascending; trips with a null motorista_id are excluded. Aggregated grain, so only the processed_at control column applies.",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "posicao_rank",
+            "type": "int",
+            "example": 1
+        },
+        {
+            "name": "motorista_id",
+            "type": "string",
+            "example": "MOT-0054"
+        },
+        {
+            "name": "motorista_nome",
+            "type": "string",
+            "example": "CARLOS SILVA"
+        },
+        {
+            "name": "viagens_concluidas",
+            "type": "bigint",
+            "example": 31
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00"
+        }
+    ]
+}
