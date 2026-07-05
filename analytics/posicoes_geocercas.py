@@ -5,7 +5,7 @@ One stage, one task:
 * ``transform_to_analytics`` — reads the staging positions and geofences,
   enriches each position with the geofence that contains it
   (`enrich_positions_with_geofences`) and writes the result to the
-  analytics layer.
+  analytics layer as a Delta table.
 
 Staging standardized the FORM of both inputs; this module applies the
 SEMANTICS: point-in-polygon matching via Apache Sedona, location
@@ -20,10 +20,14 @@ import logging
 import os
 
 from data_quality.validation import enforce_table_config
+from general.delta_io import (
+    mark_delta_partition_processed,
+    read_delta_partition,
+    write_delta_partition,
+)
 from general.utils import (
     layer_dir,
     load_table_config,
-    partition_path,
 )
 from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
@@ -277,30 +281,33 @@ def build_analytics(posicoes: DataFrame, geocercas: DataFrame, config: dict) -> 
 def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     """Read staging inputs, build geospatial analytics and write the partition.
 
+    The output is a Delta table: the write atomically replaces only
+    this `ingest_date` partition and the marker is set right after
+    the commit (Delta writes no `_SUCCESS` file).
+
     Args:
-        spark: Active SparkSession.
+        spark: Active SparkSession (must be created with
+            `enable_delta=True`).
         ingest_date: Ingestion date in `YYYY-MM-DD` format, used
             to locate the staging partitions and to partition the
             analytics layer.
 
     Returns:
-        Metrics about the write: layer name, destination path, record
-        count, how many positions fell inside a geofence and how many
-        entry/exit events were flagged.
+        Metrics about the write: layer name, destination table,
+        ingestion date, record count, how many positions fell inside
+        a geofence and how many entry/exit events were flagged.
     """
-    positions_path = partition_path(STAGING_POSICOES_DIR, ingest_date)
-    geofences_path = partition_path(STAGING_GEOCERCAS_DIR, ingest_date)
-    log.info("Reading staging positions from %s", positions_path)
-    positions = spark.read.parquet(positions_path)
-    log.info("Reading staging geofences from %s", geofences_path)
-    geofences = spark.read.parquet(geofences_path)
+    log.info("Reading staging positions from %s (ingest_date=%s)", STAGING_POSICOES_DIR, ingest_date)
+    positions = read_delta_partition(spark, STAGING_POSICOES_DIR, ingest_date)
+    log.info("Reading staging geofences from %s (ingest_date=%s)", STAGING_GEOCERCAS_DIR, ingest_date)
+    geofences = read_delta_partition(spark, STAGING_GEOCERCAS_DIR, ingest_date)
 
     config = load_table_config(TABLE_CONFIG)
     df = build_analytics(positions, geofences, config)
 
-    destination = partition_path(ANALYTICS_DIR, ingest_date)
-    log.info("Writing analytics layer to %s", destination)
-    df.coalesce(1).write.mode("overwrite").parquet(destination)
+    log.info("Writing analytics layer to %s (Delta)", ANALYTICS_DIR)
+    write_delta_partition(df, ANALYTICS_DIR, ingest_date)
+    mark_delta_partition_processed(ANALYTICS_DIR, ingest_date)
 
     total = df.count()
     in_geofence = df.filter(F.col("classificacao_localizacao") == "em_geocerca").count()
@@ -316,7 +323,8 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     )
     return {
         "layer": "analytics",
-        "path": destination,
+        "path": ANALYTICS_DIR,
+        "ingest_date": ingest_date,
         "records": total,
         "records_in_geofence": in_geofence,
         "entry_events": entry_events,
