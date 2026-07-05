@@ -1,0 +1,27 @@
+{
+    "table_name": "analytics_viagens_por_mes_status",
+    "description": "Trips per month and per status. mes = month of data_inicio (trips without a start date are excluded); a null status groups the trips whose status was nullified by staging quality. Aggregated grain, so only the processed_at control column applies (lineage/quality live in analytics_viagens_enriquecidas).",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "mes",
+            "type": "string",
+            "example": "2026-04"
+        },
+        {
+            "name": "status",
+            "type": "string",
+            "example": ["concluida", "em_transito", "cancelada", "atrasada"]
+        },
+        {
+            "name": "total_viagens",
+            "type": "bigint",
+            "example": 42
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00"
+        }
+    ]
+}

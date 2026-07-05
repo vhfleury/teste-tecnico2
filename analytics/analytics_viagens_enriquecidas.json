@@ -1,0 +1,217 @@
+{
+    "table_name": "analytics_viagens_enriquecidas",
+    "description": "Trips fact enriched with vehicle, driver, origin/destination geofences and per-trip metrics. Referential orphans are flagged in dq_observations (merged with the staging observations), never dropped. atrasada_flag = explicit 'atrasada' status OR actual end after planned end; mes = month of data_inicio (UTC session).",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "viagem_id",
+            "type": "string",
+            "example": "VIA-000001"
+        },
+        {
+            "name": "veiculo_id",
+            "type": "string",
+            "example": "VEI-0062"
+        },
+        {
+            "name": "motorista_id",
+            "type": "string",
+            "example": "MOT-0054"
+        },
+        {
+            "name": "geocerca_origem_id",
+            "type": "string",
+            "example": "GEO-0005"
+        },
+        {
+            "name": "geocerca_destino_id",
+            "type": "string",
+            "example": "GEO-0027"
+        },
+        {
+            "name": "data_inicio",
+            "type": "timestamp",
+            "example": "2026-04-28 21:34:51.499012"
+        },
+        {
+            "name": "data_fim_prevista",
+            "type": "timestamp",
+            "example": "2026-04-29 15:34:51.499012"
+        },
+        {
+            "name": "data_fim_real",
+            "type": "timestamp",
+            "example": "2026-05-01 00:36:13.170904"
+        },
+        {
+            "name": "status",
+            "type": "string",
+            "example": ["concluida", "em_transito", "cancelada", "atrasada"]
+        },
+        {
+            "name": "distancia_km",
+            "type": "int",
+            "example": 697
+        },
+        {
+            "name": "peso_carga_kg",
+            "type": "int",
+            "example": 29358
+        },
+        {
+            "name": "nota_fiscal",
+            "type": "string",
+            "example": "NF-577810"
+        },
+        {
+            "name": "veiculo_placa",
+            "type": "string",
+            "example": "PFX4S35"
+        },
+        {
+            "name": "veiculo_marca",
+            "type": "string",
+            "example": "VOLVO"
+        },
+        {
+            "name": "veiculo_modelo",
+            "type": "string",
+            "example": "VM 270"
+        },
+        {
+            "name": "veiculo_tipo",
+            "type": "string",
+            "example": "Carreta LS"
+        },
+        {
+            "name": "veiculo_capacidade_kg",
+            "type": "int",
+            "example": 41500
+        },
+        {
+            "name": "veiculo_status",
+            "type": "string",
+            "example": ["ativo", "em_manutencao", "inativo"]
+        },
+        {
+            "name": "motorista_nome",
+            "type": "string",
+            "example": "NICOLAS SOUSA"
+        },
+        {
+            "name": "motorista_categoria_cnh",
+            "type": "string",
+            "example": ["C", "D", "E"]
+        },
+        {
+            "name": "motorista_base_operacional",
+            "type": "string",
+            "example": "CD Recife - Jaboatao"
+        },
+        {
+            "name": "motorista_status",
+            "type": "string",
+            "example": ["ATIVO", "FERIAS", "AFASTADO", "DESLIGADO"]
+        },
+        {
+            "name": "origem_nome",
+            "type": "string",
+            "example": "CD Sao Paulo - Guarulhos"
+        },
+        {
+            "name": "origem_tipo",
+            "type": "string",
+            "example": ["centro_distribuicao", "pedagio", "posto_combustivel", "cliente"]
+        },
+        {
+            "name": "origem_uf",
+            "type": "string",
+            "example": "SP"
+        },
+        {
+            "name": "destino_nome",
+            "type": "string",
+            "example": "Cliente Rio de Janeiro - Centro"
+        },
+        {
+            "name": "destino_tipo",
+            "type": "string",
+            "example": ["centro_distribuicao", "pedagio", "posto_combustivel", "cliente"]
+        },
+        {
+            "name": "destino_uf",
+            "type": "string",
+            "example": "RJ"
+        },
+        {
+            "name": "velocidade_media_kmh",
+            "type": "double",
+            "example": 62.35
+        },
+        {
+            "name": "num_posicoes",
+            "type": "bigint",
+            "example": 184
+        },
+        {
+            "name": "primeira_posicao_ts",
+            "type": "timestamp",
+            "example": "2026-04-28 21:34:58.588212"
+        },
+        {
+            "name": "ultima_posicao_ts",
+            "type": "timestamp",
+            "example": "2026-04-29 15:12:41.093214"
+        },
+        {
+            "name": "duracao_horas",
+            "type": "double",
+            "example": 27.02
+        },
+        {
+            "name": "duracao_prevista_horas",
+            "type": "double",
+            "example": 18.0
+        },
+        {
+            "name": "atraso_horas",
+            "type": "double",
+            "example": 9.02
+        },
+        {
+            "name": "atrasada_flag",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "mes",
+            "type": "string",
+            "example": "2026-04"
+        },
+        {
+            "name": "source_file",
+            "type": "string",
+            "example": "/opt/airflow/data/viagens/viagens.csv"
+        },
+        {
+            "name": "ingested_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:00:00"
+        },
+        {
+            "name": "dq_observations",
+            "type": "string",
+            "example": "driver_not_found;no_positions_found"
+        },
+        {
+            "name": "quality_ok",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00"
+        }
+    ]
+}

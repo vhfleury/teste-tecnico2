@@ -1,0 +1,27 @@
+{
+    "table_name": "analytics_tempo_parado_geocercas",
+    "description": "Average dwell time inside geofences per geofence type (CD, toll, gas station, client). A visit is a consecutive run of positions inside the same geofence along a trip (from the entry event flagged by analytics_posicoes_geocercas); its duration is last position timestamp - first position timestamp, so a single-position visit counts as 0 minutes. Aggregated grain, so only the processed_at control column applies.",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "geocerca_tipo",
+            "type": "string",
+            "example": ["centro_distribuicao", "pedagio", "posto_combustivel", "cliente"]
+        },
+        {
+            "name": "total_visitas",
+            "type": "bigint",
+            "example": 57
+        },
+        {
+            "name": "tempo_medio_parado_minutos",
+            "type": "double",
+            "example": 12.5
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00"
+        }
+    ]
+}
