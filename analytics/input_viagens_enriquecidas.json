@@ -1,0 +1,438 @@
+{
+    "staging_viagens": [
+        {
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0001",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "data_inicio": "2026-04-01 08:00:00",
+            "data_fim_prevista": "2026-04-01 20:00:00",
+            "data_fim_real": "2026-04-01 18:30:00",
+            "status": "concluida",
+            "distancia_km": 430,
+            "peso_carga_kg": 12000,
+            "nota_fiscal": "NF-100001",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000002",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0002",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0001",
+            "data_inicio": "2026-04-02 06:00:00",
+            "data_fim_prevista": "2026-04-02 18:00:00",
+            "data_fim_real": "2026-04-03 00:15:00",
+            "status": "concluida",
+            "distancia_km": 520,
+            "peso_carga_kg": 18000,
+            "nota_fiscal": "NF-100002",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000003",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-0003",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0003",
+            "data_inicio": "2026-04-05 09:00:00",
+            "data_fim_prevista": "2026-04-05 15:00:00",
+            "data_fim_real": "2026-04-05 19:45:00",
+            "status": "atrasada",
+            "distancia_km": 180,
+            "peso_carga_kg": 8000,
+            "nota_fiscal": "NF-100003",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000004",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0002",
+            "geocerca_origem_id": "GEO-0003",
+            "geocerca_destino_id": "GEO-0004",
+            "data_inicio": "2026-04-10 07:30:00",
+            "data_fim_prevista": "2026-04-10 13:30:00",
+            "data_fim_real": null,
+            "status": "cancelada",
+            "distancia_km": 260,
+            "peso_carga_kg": 15000,
+            "nota_fiscal": "NF-100004",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000005",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0001",
+            "geocerca_origem_id": "GEO-0004",
+            "geocerca_destino_id": "GEO-0002",
+            "data_inicio": "2026-05-03 10:00:00",
+            "data_fim_prevista": "2026-05-04 10:00:00",
+            "data_fim_real": null,
+            "status": "em_transito",
+            "distancia_km": 900,
+            "peso_carga_kg": 22000,
+            "nota_fiscal": "NF-100005",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000006",
+            "veiculo_id": "VEI-9999",
+            "motorista_id": "MOT-0003",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0003",
+            "data_inicio": "2026-05-08 08:00:00",
+            "data_fim_prevista": "2026-05-08 20:00:00",
+            "data_fim_real": "2026-05-08 19:00:00",
+            "status": "concluida",
+            "distancia_km": 410,
+            "peso_carga_kg": 9500,
+            "nota_fiscal": "NF-100006",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000007",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-9999",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0004",
+            "data_inicio": "2026-05-12 14:00:00",
+            "data_fim_prevista": "2026-05-13 02:00:00",
+            "data_fim_real": "2026-05-13 01:00:00",
+            "status": "concluida",
+            "distancia_km": 480,
+            "peso_carga_kg": 20000,
+            "nota_fiscal": "NF-100007",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000008",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0001",
+            "geocerca_origem_id": "GEO-9998",
+            "geocerca_destino_id": "GEO-0002",
+            "data_inicio": "2026-06-02 05:00:00",
+            "data_fim_prevista": "2026-06-02 17:00:00",
+            "data_fim_real": "2026-06-02 16:00:00",
+            "status": "concluida",
+            "distancia_km": 460,
+            "peso_carga_kg": 11000,
+            "nota_fiscal": "NF-100008",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000009",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0002",
+            "geocerca_origem_id": "GEO-0003",
+            "geocerca_destino_id": "GEO-9999",
+            "data_inicio": "2026-06-06 09:15:00",
+            "data_fim_prevista": "2026-06-06 21:15:00",
+            "data_fim_real": "2026-06-07 03:15:00",
+            "status": "concluida",
+            "distancia_km": 610,
+            "peso_carga_kg": 17500,
+            "nota_fiscal": "NF-100009",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000010",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-0003",
+            "geocerca_origem_id": "GEO-0004",
+            "geocerca_destino_id": "GEO-0001",
+            "data_inicio": null,
+            "data_fim_prevista": "2026-06-10 18:00:00",
+            "data_fim_real": "2026-06-10 20:00:00",
+            "status": "concluida",
+            "distancia_km": 350,
+            "peso_carga_kg": 13000,
+            "nota_fiscal": "NF-100010",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "missing_start_date",
+            "quality_ok": false
+        },
+        {
+            "viagem_id": "VIA-000011",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0003",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0004",
+            "data_inicio": "2026-05-20 07:00:00",
+            "data_fim_prevista": "2026-05-20 19:00:00",
+            "data_fim_real": "2026-05-21 00:00:00",
+            "status": null,
+            "distancia_km": 540,
+            "peso_carga_kg": 16000,
+            "nota_fiscal": "NF-100011",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "invalid_status",
+            "quality_ok": false
+        },
+        {
+            "viagem_id": "VIA-000012",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-0001",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "data_inicio": "2026-06-15 06:00:00",
+            "data_fim_prevista": "2026-06-15 18:00:00",
+            "data_fim_real": "2026-06-15 17:30:00",
+            "status": "concluida",
+            "distancia_km": 495,
+            "peso_carga_kg": 14000,
+            "nota_fiscal": "NF-100012",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        }
+    ],
+    "staging_veiculos": [
+        {
+            "veiculo_id": "VEI-0001",
+            "placa": "ABC1D23",
+            "marca": "VOLVO",
+            "modelo": "VM 270",
+            "tipo": "Carreta LS",
+            "capacidade_kg": 41500,
+            "status": "ativo"
+        },
+        {
+            "veiculo_id": "VEI-0002",
+            "placa": "DEF2E45",
+            "marca": "SCANIA",
+            "modelo": "R450",
+            "tipo": "Bitrem",
+            "capacidade_kg": 57000,
+            "status": "em_manutencao"
+        },
+        {
+            "veiculo_id": "VEI-0003",
+            "placa": "GHI3F67",
+            "marca": "MERCEDES",
+            "modelo": "ACTROS 2651",
+            "tipo": "VUC",
+            "capacidade_kg": 3500,
+            "status": "ativo"
+        }
+    ],
+    "staging_motoristas": [
+        {
+            "motorista_id": "MOT-0001",
+            "nome": "CARLOS SILVA",
+            "categoria_cnh": "E",
+            "base_operacional": "CD Sao Paulo - Guarulhos",
+            "status": "ATIVO"
+        },
+        {
+            "motorista_id": "MOT-0002",
+            "nome": "ANA LIMA",
+            "categoria_cnh": "D",
+            "base_operacional": "CD Recife - Jaboatao",
+            "status": "FERIAS"
+        },
+        {
+            "motorista_id": "MOT-0003",
+            "nome": "JOAO PEREIRA",
+            "categoria_cnh": "C",
+            "base_operacional": "CD Curitiba - CIC",
+            "status": "ATIVO"
+        }
+    ],
+    "staging_geocercas": [
+        {
+            "geocerca_id": "GEO-0001",
+            "nome": "CD Sao Paulo - Guarulhos",
+            "tipo": "centro_distribuicao",
+            "uf": "SP"
+        },
+        {
+            "geocerca_id": "GEO-0002",
+            "nome": "Cliente Rio de Janeiro - Centro",
+            "tipo": "cliente",
+            "uf": "RJ"
+        },
+        {
+            "geocerca_id": "GEO-0003",
+            "nome": "Posto BR-116 Registro",
+            "tipo": "posto_combustivel",
+            "uf": "SP"
+        },
+        {
+            "geocerca_id": "GEO-0004",
+            "nome": "Pedagio Dutra km 207",
+            "tipo": "pedagio",
+            "uf": "RJ"
+        }
+    ],
+    "staging_posicoes": [
+        {
+            "posicao_id": "POS-0001",
+            "viagem_id": "VIA-000001",
+            "velocidade_kmh": 40,
+            "timestamp": "2026-04-01 08:10:00"
+        },
+        {
+            "posicao_id": "POS-0002",
+            "viagem_id": "VIA-000001",
+            "velocidade_kmh": 60,
+            "timestamp": "2026-04-01 12:00:00"
+        },
+        {
+            "posicao_id": "POS-0003",
+            "viagem_id": "VIA-000001",
+            "velocidade_kmh": 80,
+            "timestamp": "2026-04-01 18:00:00"
+        },
+        {
+            "posicao_id": "POS-0004",
+            "viagem_id": "VIA-000002",
+            "velocidade_kmh": 50,
+            "timestamp": "2026-04-02 06:30:00"
+        },
+        {
+            "posicao_id": "POS-0005",
+            "viagem_id": "VIA-000002",
+            "velocidade_kmh": 71,
+            "timestamp": "2026-04-02 23:00:00"
+        },
+        {
+            "posicao_id": "POS-0006",
+            "viagem_id": "VIA-000003",
+            "velocidade_kmh": 45,
+            "timestamp": "2026-04-05 09:30:00"
+        },
+        {
+            "posicao_id": "POS-0007",
+            "viagem_id": "VIA-000003",
+            "velocidade_kmh": 56,
+            "timestamp": "2026-04-05 18:00:00"
+        },
+        {
+            "posicao_id": "POS-0008",
+            "viagem_id": "VIA-000005",
+            "velocidade_kmh": 30,
+            "timestamp": "2026-05-03 10:20:00"
+        },
+        {
+            "posicao_id": "POS-0009",
+            "viagem_id": "VIA-000005",
+            "velocidade_kmh": null,
+            "timestamp": "2026-05-03 15:00:00"
+        },
+        {
+            "posicao_id": "POS-0010",
+            "viagem_id": "VIA-000005",
+            "velocidade_kmh": 90,
+            "timestamp": "2026-05-03 20:00:00"
+        },
+        {
+            "posicao_id": "POS-0011",
+            "viagem_id": "VIA-000006",
+            "velocidade_kmh": 62,
+            "timestamp": "2026-05-08 12:00:00"
+        },
+        {
+            "posicao_id": "POS-0012",
+            "viagem_id": "VIA-000007",
+            "velocidade_kmh": 58,
+            "timestamp": "2026-05-12 16:00:00"
+        },
+        {
+            "posicao_id": "POS-0013",
+            "viagem_id": "VIA-000007",
+            "velocidade_kmh": 72,
+            "timestamp": "2026-05-12 22:00:00"
+        },
+        {
+            "posicao_id": "POS-0014",
+            "viagem_id": "VIA-000008",
+            "velocidade_kmh": 70,
+            "timestamp": "2026-06-02 10:00:00"
+        },
+        {
+            "posicao_id": "POS-0015",
+            "viagem_id": "VIA-000009",
+            "velocidade_kmh": 55,
+            "timestamp": "2026-06-06 15:00:00"
+        },
+        {
+            "posicao_id": "POS-0016",
+            "viagem_id": "VIA-000010",
+            "velocidade_kmh": 66,
+            "timestamp": "2026-06-10 19:00:00"
+        },
+        {
+            "posicao_id": "POS-0017",
+            "viagem_id": "VIA-000011",
+            "velocidade_kmh": 44,
+            "timestamp": "2026-05-20 10:00:00"
+        },
+        {
+            "posicao_id": "POS-0018",
+            "viagem_id": "VIA-000011",
+            "velocidade_kmh": 57,
+            "timestamp": "2026-05-20 21:00:00"
+        },
+        {
+            "posicao_id": "POS-0019",
+            "viagem_id": "VIA-000012",
+            "velocidade_kmh": 40,
+            "timestamp": "2026-06-15 07:00:00"
+        },
+        {
+            "posicao_id": "POS-0020",
+            "viagem_id": "VIA-000012",
+            "velocidade_kmh": 50,
+            "timestamp": "2026-06-15 10:00:00"
+        },
+        {
+            "posicao_id": "POS-0021",
+            "viagem_id": "VIA-000012",
+            "velocidade_kmh": 60,
+            "timestamp": "2026-06-15 13:00:00"
+        },
+        {
+            "posicao_id": "POS-0022",
+            "viagem_id": "VIA-000012",
+            "velocidade_kmh": 80,
+            "timestamp": "2026-06-15 16:30:00"
+        },
+        {
+            "posicao_id": "POS-0023",
+            "viagem_id": null,
+            "velocidade_kmh": 50,
+            "timestamp": "2026-06-15 12:00:00"
+        }
+    ]
+}
