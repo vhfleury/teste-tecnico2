@@ -1,208 +1,134 @@
-# Teste Técnico — Engenheiro de Dados (Python)
+# Pipeline de Dados — Logística
 
-Olá! Seja bem-vindo(a) ao nosso processo seletivo. Este teste foi elaborado para avaliarmos seu conhecimento técnico em engenharia de dados, sua capacidade de organização, modelagem de dados, arquitetura de pipelines e boas práticas de desenvolvimento.
+Pipeline ETL em PySpark, orquestrado com Airflow, que processa 5 fontes de dados de logística (frota, motoristas, geocercas, viagens e rastreamento GPS) em um lakehouse em camadas, com enriquecimento geoespacial e métricas agregadas.
 
-Leia o documento com atenção antes de começar. Boa sorte!
+O enunciado do desafio está em [desafio.md](desafio.md). O dicionário de dados em [docs/dados.md](docs/dados.md).
 
----
+## Solução e decisões técnicas
 
-## Cenário
+O dado flui por três camadas, todas particionadas por `ingest_date`:
 
-Você foi contratado(a) como engenheiro(a) de dados de uma **empresa de logística** que opera uma frota de caminhões em todo o Brasil. A empresa coleta dados de **rastreamento GPS em tempo real**, controla **cercas geoespaciais** (centros de distribuição, pedágios, postos e clientes) e gerencia **viagens, veículos e motoristas**.
+- **raw** — cópia fiel da fonte, sem alterar valores (primitivos lidos como string, para um cast precoce não mascarar valor sujo)
+- **staging** — padronização de forma: tipos, formatos, deduplicação por chave e flags de qualidade
+- **analytics** — semântica: joins, enriquecimento geoespacial, regras de negócio e agregações
 
-Hoje, esses dados estão espalhados em diferentes formatos e sistemas, sem tratamento ou consolidação. Sua missão é construir um **pipeline de dados** que transforme esses dados brutos em informação confiável para o time de operações.
+Decisões principais:
 
-Os dados brutos estão disponíveis no diretório [`data/`](./data/) e representam **5 fontes distintas**:
+**Staging dirigida por config.** Cada tabela declara colunas, tipos, tratamentos e validações em um JSON (`pipelines/<fonte>/staging_<fonte>.json`). Um motor genérico executa a cadeia para qualquer fonte — adicionar fonte nova não exige código, só o registro e os fixtures. O config funciona como contrato: o write aborta se o DataFrame divergir do declarado. A única fonte com código próprio é geocercas, que precisa achatar o GeoJSON antes da cadeia comum.
 
-| Fonte | Formato | Registros | Descrição |
-|---|---|---|---|
-| `veiculos/veiculos.csv` | CSV | ~150 | Cadastro da frota |
-| `motoristas/motoristas.json` | JSON | ~120 | Cadastro de motoristas |
-| `geocercas/geocercas.geojson` | GeoJSON | ~38 | Cercas geoespaciais (CDs, pedágios, postos, clientes) |
-| `viagens/viagens.csv` | CSV | ~3.000 | Registro de viagens realizadas |
-| `rastreamento/posicoes.parquet` | Parquet | ~56.000 | Posições GPS dos veículos durante as viagens |
+**Qualidade por quarentena.** Valor inválido é anulado, o motivo vai para `dq_observations` e a linha é marcada em `quality_ok` — mas nunca é descartada, para preservar a chave nos joins. Validações declaradas nos configs cobrem os defeitos do enunciado: coordenadas zeradas ou fora do Brasil, velocidades negativas ou impossíveis, campos obrigatórios, duplicatas. Na analytics, órfãos referenciais (`driver_not_found`, `vehicle_not_found`, ...) são acrescentados à quarentena herdada do staging, sem sobrescrevê-la.
 
-> ⚠️ **Atenção:** os dados contêm **inconsistências propositais** (duplicatas, valores nulos, coordenadas inválidas, registros órfãos, velocidades absurdas, etc.). O tratamento dessas inconsistências faz parte da avaliação.
+**Geoespacial com Sedona.** O point-in-polygon roda como spatial join dentro do Spark (`ST_Contains`). Cada posição GPS é classificada como `em_geocerca` ou `em_rota`, e eventos de entrada/saída de geocerca são detectados por window functions na sequência temporal de cada viagem. Geometrias malformadas são validadas estruturalmente antes de chegar ao Sedona, para uma geocerca quebrada não derrubar a partição.
 
----
+**Uma tabela por métrica.** As métricas pedidas têm grãos diferentes (mês × status, rota, motorista, tipo de geocerca), então cada uma vive em sua própria tabela com grão explícito, em vez de uma tabela única com grãos misturados. A velocidade média por viagem está no grão do fato e por isso é coluna da `viagens_enriquecidas`. O registro `METRIC_TABLES` dirige o transform, os testes e o guard de cobertura: métrica nova sem config ou sem golden falha o teste.
 
-## O que deve ser feito
+**Idempotência por partição.** Cada execução escreve só na sua partição `ingest_date` e pula partições já processadas (checagem barata, antes de subir o Spark). Reprocessar uma data sobrescreve apenas aquela partição. Na gold, o Delta Lake faz isso atomicamente com `replaceWhere`.
 
-Construir um **pipeline ETL/ELT** que:
+**Agendamento por assets.** As DAGs de staging publicam Assets do Airflow; as de analytics agendam pelos assets em vez de cron, então a gold não lê partição que ainda não existe. As DAGs são finas: a lógica PySpark fica em `pipelines/` e `analytics/`.
 
-### 1. Extração (E)
-- Leia os dados brutos das 5 fontes em seus respectivos formatos (CSV, JSON, GeoJSON, Parquet).
+**Testes golden.** Cada pipeline tem input e output esperados curados nos fixtures (com duplicatas, nulos, órfãos e valores absurdos). O teste roda o tratamento real e compara com o golden por chave primária, reportando linhas faltando, sobrando e diferenças de célula.
 
-### 2. Transformação (T)
-As seguintes transformações são **obrigatórias**:
+## Arquitetura
 
-- **Limpeza e qualidade de dados:**
-  - Tratar valores nulos, duplicados e inconsistentes
-  - Validar integridade referencial entre as tabelas (ex: viagens com `motorista_id` ou `veiculo_id` inexistente)
-  - Filtrar ou tratar coordenadas GPS inválidas (lat/lon zeradas, fora do Brasil)
-  - Remover velocidades absurdas (negativas ou fisicamente impossíveis)
-  - Padronizar formatos de datas, strings e campos categóricos
+```mermaid
+flowchart LR
+    D["data/<br/>5 fontes"] --> S["DAGs de staging (5)<br/>extract_to_raw >> transform_to_staging"]
+    S --> RAW[("raw")] --> STG[("staging")]
+    STG -- assets --> PG["analytics_posicoes_geocercas<br/>point-in-polygon + eventos"]
+    STG -- assets --> VE["analytics_viagens_enriquecidas<br/>fato consolidado"]
+    PG -- asset --> MV["analytics_metricas_viagens"]
+    VE -- asset --> MV
+    PG & VE & MV --> GOLD[("analytics")]
+```
 
-- **Enriquecimento geoespacial:**
-  - Para cada posição GPS do rastreamento, determinar se o veículo estava **dentro de alguma geocerca** (point-in-polygon)
-  - Classificar cada posição como: `em_geocerca` (identificando qual) ou `em_rota`
-  - Detectar **eventos de entrada e saída** de geocercas ao longo de cada viagem
+São 8 DAGs: 4 geradas dinamicamente do registro `STAGING_SOURCES`, 1 dedicada de geocercas e 3 de analytics.
 
-- **Modelagem e agregações:**
-  - Criar uma tabela consolidada de **viagens enriquecidas** (com dados do veículo, motorista, geocercas de origem/destino e métricas da viagem)
-  - Gerar as seguintes métricas agregadas:
-    - **Viagens por mês e por status** (concluída, cancelada, atrasada)
-    - **Tempo médio de viagem** por rota (origem → destino)
-    - **Velocidade média** por viagem
-    - **Taxa de atraso** (viagens atrasadas / total) por mês
-    - **Top 10 motoristas** por número de viagens concluídas
-    - **Utilização da frota** (veículos ativos com viagens / total de veículos ativos) por mês
-    - **Tempo médio parado em geocercas** (por tipo: CD, pedágio, posto, cliente)
+Tabelas da camada analytics:
 
-### 3. Carga (L)
-- Persistir os dados transformados e as métricas em um **formato estruturado** (Parquet, Delta Lake, PostgreSQL, Elasticsearch ou outro de sua escolha).
-- Organizar a saída em **camadas** (ex: `raw` → `staging` → `trusted/analytics`).
-
----
-
-## Stack Obrigatória
-
-| Camada | Tecnologia |
+| Tabela | Grão |
 |---|---|
-| Linguagem | **Python 3.10+** |
-| Processamento | **Apache Spark (PySpark)** |
-| Containerização | **Docker / Docker Compose** |
+| `posicoes_geocercas` | posição GPS classificada + eventos de entrada/saída |
+| `viagens_enriquecidas` | viagem (veículo, motorista, geocercas, duração, atraso, velocidade média, quarentena) |
+| `viagens_por_mes_status` | mês × status |
+| `tempo_medio_por_rota` | origem × destino |
+| `taxa_atraso_mensal` | mês |
+| `top_motoristas` | motorista (top 10 por viagens concluídas) |
+| `utilizacao_frota_mensal` | mês |
+| `tempo_parado_geocercas` | tipo de geocerca |
 
-### Livre escolha
+## Tecnologias
 
-- **Formato de saída:** Parquet, Delta Lake, PostgreSQL, Elasticsearch, etc.
-- **Orquestração:** Airflow, Prefect, Dagster, scripts agendados, Makefile, etc.
-- **Geoespacial:** Sedona (GeoSpark), GeoPandas, Shapely, H3, ou outra lib de sua preferência.
+| Tecnologia | Por quê |
+|---|---|
+| PySpark 3.5.3 | engine de processamento; modo local dentro do worker — o volume não justifica cluster |
+| Airflow 3.1.5 (LocalExecutor) | DAGs + agendamento por assets; LocalExecutor dispensa Celery/Redis |
+| Apache Sedona 1.9.0 | point-in-polygon distribuído dentro do Spark, sem coletar dados no driver |
+| Delta Lake (delta-spark 3.3.2) | versionamento da gold e overwrite atômico por partição (replaceWhere) |
+| Docker Compose | stack completa reproduzível; jars do Delta/Sedona baixados no build da imagem |
+| pytest + ruff + GitHub Actions | testes unitários e golden, lint e CI |
 
-### Opcional (diferencial)
+## Pré-requisitos
 
-- Orquestrador com DAGs (Airflow, Prefect, Dagster)
-- Apache Sedona ou outra lib geoespacial integrada ao Spark
-- Delta Lake para versionamento de dados
-- Testes automatizados (pytest, Great Expectations, Soda, etc.)
-- Data quality checks integrados ao pipeline
-- Logging estruturado
-- CI com GitHub Actions (lint, testes)
+- Docker com Compose v2
+- ~6 GB de RAM livres e porta 8080 disponível
 
----
+Não precisa de Python, Java ou Spark na máquina — tudo roda nos containers.
 
-## Requisitos Técnicos
+## Como rodar
 
-- O projeto deve rodar em **containers Docker** (recomendado `docker-compose` para orquestrar todos os serviços).
-- O projeto deve subir e executar o pipeline com **um único comando** (ex: `docker-compose up`).
-- O processamento principal deve ser feito com **PySpark** (não apenas Pandas).
-- O pipeline deve ser **idempotente** — executá-lo mais de uma vez não deve gerar duplicação nos dados de saída.
-- Variáveis de configuração devem estar em variáveis de ambiente ou arquivos de configuração, nunca hardcoded no código.
-
----
-
-## Como participar
-
-1. Faça um **fork** deste repositório.
-2. Desenvolva sua solução no fork.
-3. Ao finalizar, envie o **link do seu repositório público** conforme as instruções de entrega abaixo.
-
----
-
-## O que será avaliado
-
-1. **Commits contínuos e explicados**
-   Queremos ver a evolução do seu raciocínio ao longo do desenvolvimento. Commits pequenos, frequentes e com mensagens claras são esperados.
-
-2. **Arquitetura do pipeline**
-   Organização das etapas (extração, transformação, carga), separação de camadas de dados, escolhas arquiteturais coerentes e justificáveis.
-
-3. **Processamento geoespacial**
-   Capacidade de trabalhar com dados de coordenadas, geocercas (point-in-polygon) e detecção de eventos de entrada/saída. Escolha e uso adequado de bibliotecas geoespaciais.
-
-4. **Modelagem de dados**
-   Estrutura dos dados de saída, escolha de formatos de armazenamento, particionamento, definição de schemas e clareza na organização dos datasets.
-
-5. **Qualidade e organização do código**
-   Código limpo, legível, nomes significativos, padrões consistentes, uso adequado do PySpark e boas práticas Python (tipagem, docstrings, linting).
-
-6. **Tratamento de dados sujos**
-   Identificação e tratamento correto das inconsistências nos dados de entrada (nulos, duplicatas, órfãos, coordenadas inválidas, valores absurdos).
-
-7. **Resiliência e robustez**
-   Tratamento de falhas, idempotência, logging e capacidade do pipeline de lidar com cenários inesperados.
-
-8. **README da solução**
-   Ao desenvolver, atualize este README (ou crie um novo) com:
-   - Descrição da sua solução e decisões técnicas
-   - Arquitetura do pipeline (preferencialmente com um diagrama)
-   - Tecnologias utilizadas e justificativas
-   - Pré-requisitos
-   - Instruções claras para rodar o projeto
-   - Variáveis de ambiente necessárias (se houver)
-   - Estrutura de pastas
-   - O que você faria diferente com mais tempo
-
----
-
-## Critérios de Exclusão
-
-O candidato será **automaticamente desclassificado** caso:
-
-- O container **não inicialize** ou apresente **erro** ao subir a aplicação.
-- O pipeline **não execute** ou não produza os dados de saída esperados.
-- Forem detectados **poucos commits** ou **um único commit**, indicando uso abusivo de IA ou falta de desenvolvimento incremental.
-- **PySpark não for utilizado** como engine de processamento principal.
-- O **enriquecimento geoespacial** (point-in-polygon) não for implementado.
-- As **transformações obrigatórias** não forem implementadas.
-
-> O uso de ferramentas de IA como apoio é aceitável, mas queremos ver **seu processo de desenvolvimento**, suas decisões e sua evolução ao longo do projeto.
-
----
-
-## Entregável
-
-- **Link público do repositório no GitHub** contendo o projeto completo (fork deste repositório).
-- **Prazo final**: Será informado no contato com o candidato.
-
-### Envio
-
-O link do repositório deve ser enviado por e-mail para os endereços informados no contato com o candidato.
-
-**Assunto sugerido**: `Teste Técnico — Engenheiro de Dados — [Seu Nome Completo]`
-
-No corpo do e-mail, inclua:
-
-- Seu nome completo
-- Link público do repositório no GitHub
-- Breve descrição (1 a 2 parágrafos) sobre a arquitetura do pipeline e as decisões técnicas principais
-
----
-
-## Estrutura do repositório
-
-```
-.
-├── README.md                          # Este arquivo
-├── data/
-│   ├── veiculos/
-│   │   └── veiculos.csv               # Cadastro da frota (~150 registros)
-│   ├── motoristas/
-│   │   └── motoristas.json            # Cadastro de motoristas (~120 registros)
-│   ├── geocercas/
-│   │   └── geocercas.geojson          # Cercas geoespaciais (~38 polígonos)
-│   ├── viagens/
-│   │   └── viagens.csv               # Registro de viagens (~3.000 registros)
-│   └── rastreamento/
-│       └── posicoes.parquet           # Posições GPS (~56.000 registros)
-└── docs/
-    └── dados.md                       # Dicionário de dados
+```bash
+docker compose up -d --build
 ```
 
----
+Um comando sobe tudo: o `airflow-init` prepara o banco e o `airflow-trigger-dags` despausa e dispara as DAGs — o pipeline roda sozinho após o up.
 
-## Dúvidas
+- UI do Airflow: http://localhost:8080 (`airflow` / `airflow`)
+- Saída: `./lakehouse/<camada>/<tabela>/ingest_date=YYYY-MM-DD/`
+- Re-executar é seguro: partição já processada é pulada; reprocesso sobrescreve só a própria partição
 
-Em caso de dúvidas sobre o teste, entre em contato com as pessoas que estão conduzindo o processo seletivo.
+Testes:
 
-Bom desenvolvimento!
+```bash
+docker compose --profile debug run --rm airflow-cli bash -c "cd /opt/airflow && python -m pytest tests/ -q"
+```
+
+Lint:
+
+```bash
+ruff check .
+```
+
+Encerrar: `docker compose down` (ou `down -v` para zerar o banco do Airflow).
+
+## Variáveis de ambiente
+
+Definidas no [.env](.env) versionado, com defaults que funcionam sem configurar nada:
+
+| Variável | Default | Uso |
+|---|---|---|
+| `DATA_DIR` | `/opt/airflow/data` | fontes brutas dentro dos containers |
+| `LAKEHOUSE_DIR` | `/opt/airflow/lakehouse` | raiz das camadas raw/staging/analytics |
+| `AIRFLOW_UID` | `50000` | permissões dos volumes |
+| `AIRFLOW_IMAGE_NAME` | `bigcore-airflow-pyspark:3.1.5` | imagem construída pelo build |
+| `_AIRFLOW_WWW_USER_USERNAME` / `_PASSWORD` | `airflow` | credenciais da UI |
+
+Nenhum caminho ou credencial hardcoded: o código lê `DATA_DIR`/`LAKEHOUSE_DIR` do ambiente.
+
+## Estrutura de pastas
+
+```
+airflow/dags/          # 8 DAGs finas (lógica importada de pipelines/ e analytics/)
+analytics/             # camada gold: código de joins/métricas + contratos JSON + fixtures golden
+connections/           # fábrica da SparkSession (get_spark / run_spark)
+data/                  # fontes brutas (montadas read-only)
+docs/                  # dicionário de dados
+lakehouse/             # saída: raw/ staging/ analytics/ (gitignored)
+pipelines/             # motor genérico de staging + 1 diretório por fonte (contrato + fixtures)
+scripts/parser/        # tratamentos que alteram valores
+scripts/data_quality/  # validações que só flaggam (quarentena) + enforce do contrato
+scripts/general/       # paths, configs, helpers de I/O Delta
+tests/                 # espelha o código: unitários, golden e guard de cobertura
+Dockerfile             # airflow 3.1.5 + OpenJDK 17 + jars Delta/Sedona
+docker-compose.yml     # postgres + serviços do Airflow + init + trigger-dags
+desafio.md             # enunciado original
+```
