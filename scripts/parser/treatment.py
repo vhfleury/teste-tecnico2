@@ -17,15 +17,19 @@ from pyspark.sql import functions as F
 
 
 def normalize(column: Column) -> Column:
-    """Normalize a text column: all characters in uppercase.
+    """Normalize a text column: trim surrounding whitespace and uppercase.
+
+    Merges the former ``trim`` and ``normalize`` treatments into one, so
+    a column only needs to declare ``normalize`` to be trimmed and
+    uppercased.
 
     Args:
         column: String column to normalize.
 
     Returns:
-        The column with its text in uppercase.
+        The column trimmed and with its text in uppercase.
     """
-    return F.upper(column)
+    return F.upper(F.trim(column))
 
 
 # Treatments a table config can declare on a column (`treatments`),
@@ -34,7 +38,6 @@ def normalize(column: Column) -> Column:
 TREATMENTS = {
     "trim": F.trim,
     "normalize": normalize,
-    "lowercase": F.lower,
     "normalize_cpf": normalize_cpf,
     "normalize_telefone": normalize_telefone,
 }

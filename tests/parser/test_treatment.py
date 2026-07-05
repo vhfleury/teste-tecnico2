@@ -20,10 +20,12 @@ TABLE_CONFIG = {
 }
 
 
-def test_apply_table_treatments_normalize_uppercases_text(spark):
+def test_apply_table_treatments_normalize_trims_and_uppercases_text(spark):
+    # normalize merges the former trim + normalize pair: a single
+    # normalize treatment both trims surrounding whitespace and uppercases.
     config = {
         "table_name": "staging_example",
-        "schema": [{"name": "nome", "type": "string", "treatments": ["trim", "normalize"]}],
+        "schema": [{"name": "nome", "type": "string", "treatments": ["normalize"]}],
     }
     df = spark.createDataFrame([("  Ana Souza ",), (None,)], ["nome"])
 
@@ -99,18 +101,6 @@ def test_apply_table_treatments_normalize_telefone_via_config(spark):
     result = apply_table_treatments(df, config).collect()
 
     assert [row["telefone"] for row in result] == ["7128271996"]
-
-
-def test_apply_table_treatments_lowercase_lowercases_text(spark):
-    config = {
-        "table_name": "staging_example",
-        "schema": [{"name": "status", "type": "string", "treatments": ["trim", "lowercase"]}],
-    }
-    df = spark.createDataFrame([("  ATIVO ",), ("Em_Manutencao",), (None,)], ["status"])
-
-    result = apply_table_treatments(df, config).collect()
-
-    assert [row["status"] for row in result] == ["ativo", "em_manutencao", None]
 
 
 def test_apply_table_treatments_casts_string_to_boolean(spark):

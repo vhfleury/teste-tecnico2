@@ -278,11 +278,11 @@ def test_apply_table_validations_geofence_type_check(spark):
     }
     df = spark.createDataFrame(
         [
-            ("GEO-0001", "centro_distribuicao"),
-            ("GEO-0002", "pedagio"),
-            ("GEO-0003", "posto_combustivel"),
-            ("GEO-0004", "cliente"),
-            ("GEO-0005", "garagem"),
+            ("GEO-0001", "CENTRO_DISTRIBUICAO"),
+            ("GEO-0002", "PEDAGIO"),
+            ("GEO-0003", "POSTO_COMBUSTIVEL"),
+            ("GEO-0004", "CLIENTE"),
+            ("GEO-0005", "GARAGEM"),
         ],
         ["geocerca_id", "tipo"],
     )
@@ -292,10 +292,10 @@ def test_apply_table_validations_geofence_type_check(spark):
     assert [
         (row["geocerca_id"], row["tipo"], row["quality_ok"]) for row in result
     ] == [
-        ("GEO-0001", "centro_distribuicao", True),
-        ("GEO-0002", "pedagio", True),
-        ("GEO-0003", "posto_combustivel", True),
-        ("GEO-0004", "cliente", True),
+        ("GEO-0001", "CENTRO_DISTRIBUICAO", True),
+        ("GEO-0002", "PEDAGIO", True),
+        ("GEO-0003", "POSTO_COMBUSTIVEL", True),
+        ("GEO-0004", "CLIENTE", True),
         ("GEO-0005", None, False),
     ]
 
@@ -315,11 +315,11 @@ def test_apply_table_validations_trip_status_check(spark):
     }
     df = spark.createDataFrame(
         [
-            ("VIA-000001", "em_transito"),
-            ("VIA-000002", "concluida"),
-            ("VIA-000003", "cancelada"),
-            ("VIA-000004", "atrasada"),
-            ("VIA-000005", "planejada"),
+            ("VIA-000001", "EM_TRANSITO"),
+            ("VIA-000002", "CONCLUIDA"),
+            ("VIA-000003", "CANCELADA"),
+            ("VIA-000004", "ATRASADA"),
+            ("VIA-000005", "PLANEJADA"),
             ("VIA-000006", None),
         ],
         "viagem_id string, status string",
@@ -331,10 +331,10 @@ def test_apply_table_validations_trip_status_check(spark):
     assert [
         (row["viagem_id"], row["status"], row["quality_ok"]) for row in result
     ] == [
-        ("VIA-000001", "em_transito", True),
-        ("VIA-000002", "concluida", True),
-        ("VIA-000003", "cancelada", True),
-        ("VIA-000004", "atrasada", True),
+        ("VIA-000001", "EM_TRANSITO", True),
+        ("VIA-000002", "CONCLUIDA", True),
+        ("VIA-000003", "CANCELADA", True),
+        ("VIA-000004", "ATRASADA", True),
         ("VIA-000005", None, False),
         ("VIA-000006", None, False),
     ]
@@ -430,10 +430,10 @@ def test_apply_table_validations_vehicle_status_check(spark):
     }
     df = spark.createDataFrame(
         [
-            ("VEI-0001", "ativo"),
-            ("VEI-0002", "em_manutencao"),
-            ("VEI-0003", "inativo"),
-            ("VEI-0004", "vendido"),
+            ("VEI-0001", "ATIVO"),
+            ("VEI-0002", "EM_MANUTENCAO"),
+            ("VEI-0003", "INATIVO"),
+            ("VEI-0004", "VENDIDO"),
             ("VEI-0005", None),
         ],
         "veiculo_id string, status string",
@@ -444,9 +444,9 @@ def test_apply_table_validations_vehicle_status_check(spark):
     assert [
         (row["veiculo_id"], row["status"], row["quality_ok"]) for row in result
     ] == [
-        ("VEI-0001", "ativo", True),
-        ("VEI-0002", "em_manutencao", True),
-        ("VEI-0003", "inativo", True),
+        ("VEI-0001", "ATIVO", True),
+        ("VEI-0002", "EM_MANUTENCAO", True),
+        ("VEI-0003", "INATIVO", True),
         ("VEI-0004", None, False),
         ("VEI-0005", None, False),
     ]
