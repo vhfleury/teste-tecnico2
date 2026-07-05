@@ -101,6 +101,43 @@ def test_apply_table_treatments_normalize_telefone_via_config(spark):
     assert [row["telefone"] for row in result] == ["7128271996"]
 
 
+def test_apply_table_treatments_lowercase_lowercases_text(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [{"name": "status", "type": "string", "treatments": ["trim", "lowercase"]}],
+    }
+    df = spark.createDataFrame([("  ATIVO ",), ("Em_Manutencao",), (None,)], ["status"])
+
+    result = apply_table_treatments(df, config).collect()
+
+    assert [row["status"] for row in result] == ["ativo", "em_manutencao", None]
+
+
+def test_apply_table_treatments_casts_string_to_boolean(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {"name": "geocerca_id", "type": "string"},
+            {"name": "ativo", "type": "boolean"},
+        ],
+    }
+    df = spark.createDataFrame(
+        [("GEO-1", "true"), ("GEO-2", "false"), ("GEO-3", "sim"), ("GEO-4", None)],
+        ["geocerca_id", "ativo"],
+    )
+
+    result = apply_table_treatments(df, config).collect()
+
+    # A non-boolean token ("sim") casts to null and is flagged later by the
+    # validations, instead of aborting the job (Spark 3.5, ANSI off).
+    assert [(row["geocerca_id"], row["ativo"]) for row in result] == [
+        ("GEO-1", True),
+        ("GEO-2", False),
+        ("GEO-3", None),
+        ("GEO-4", None),
+    ]
+
+
 def test_apply_derived_columns_creates_new_column_from_source(spark):
     config = {
         "table_name": "staging_example",
