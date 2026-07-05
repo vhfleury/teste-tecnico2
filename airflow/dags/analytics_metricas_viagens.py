@@ -42,7 +42,7 @@ from airflow.sdk import Asset, dag, task
 
 from analytics.metricas_viagens import METRIC_TABLES, transform_to_analytics
 from connections.spark_session import run_spark
-from scripts.general.delta_io import gold_partition_processed
+from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import layer_dir, resolve_ingest_date
 
 log = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ def analytics_metricas_viagens():
         pending = [
             name
             for name in METRIC_TABLES
-            if not gold_partition_processed(layer_dir("analytics", name), ingest_date)
+            if not delta_partition_processed(layer_dir("analytics", name), ingest_date)
         ]
         if not pending:
             log.info(
