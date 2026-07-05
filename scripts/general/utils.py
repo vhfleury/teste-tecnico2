@@ -21,19 +21,6 @@ def layer_dir(layer: str, dataset: str) -> str:
     return f"{LAKEHOUSE_DIR}/{layer}/{dataset}"
 
 
-def partition_path(base_dir: str, ingest_date: str) -> str:
-    """Build the partitioned path for a given ingestion date.
-
-    Args:
-        base_dir: Base directory of the dataset in its layer.
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The `ingest_date` partition path under `base_dir`.
-    """
-    return f"{base_dir}/ingest_date={ingest_date}"
-
-
 def load_table_config(path: str) -> dict:
     """Load a table config JSON (name, description, schema).
 
@@ -66,15 +53,3 @@ def resolve_ingest_date(context: dict) -> str:
     if ds:
         return ds
     return context["dag_run"].run_after.strftime("%Y-%m-%d")
-
-
-def partition_processed(path: str) -> bool:
-    """Check whether a partition was already written successfully.
-
-    Args:
-        path: Path to the partition directory.
-
-    Returns:
-        True if a `_SUCCESS` marker exists under `path`.
-    """
-    return os.path.exists(os.path.join(path, "_SUCCESS"))
