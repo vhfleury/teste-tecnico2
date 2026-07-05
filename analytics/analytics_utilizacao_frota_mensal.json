@@ -1,0 +1,32 @@
+{
+    "table_name": "analytics_utilizacao_frota_mensal",
+    "description": "Monthly fleet utilization: distinct active vehicles with trips in the month / total active vehicles (staging_veiculos with status 'ativo'). Trips by vehicles outside the active fleet do not count in the numerator, keeping the rate <= 1. mes = month of data_inicio; trips without a start date are excluded. Aggregated grain, so only the processed_at control column applies.",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "mes",
+            "type": "string",
+            "example": "2026-04"
+        },
+        {
+            "name": "veiculos_com_viagem",
+            "type": "bigint",
+            "example": 96
+        },
+        {
+            "name": "veiculos_ativos_total",
+            "type": "bigint",
+            "example": 128
+        },
+        {
+            "name": "taxa_utilizacao",
+            "type": "double",
+            "example": 0.75
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00"
+        }
+    ]
+}

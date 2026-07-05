@@ -82,6 +82,36 @@ def coordinates_are_in_brazil(latitude: Column, longitude: Column) -> Column:
 GEOJSON_POLYGON_SCHEMA = "type string, coordinates array<array<array<double>>>"
 
 
+def _polygon_checks(column: Column) -> tuple[Column, Column, Column]:
+    """Build the expressions shared by the GeoJSON Polygon checks.
+
+    Single definition of what a structurally valid polygon is, shared
+    by `geojson_polygon_is_valid` and `geojson_polygon_is_in_brazil`.
+    The expressions are not null-safe: an unparseable geometry yields
+    null, and each caller decides how nulls count for its concern.
+
+    Args:
+        column: String column holding the GeoJSON geometry.
+
+    Returns:
+        A tuple with the outer ring, the structural-validity flag
+        (``Polygon`` type, non-empty coordinates, ring with at least
+        4 points) and the zeroed-point flag (the "null island"
+        defect).
+    """
+    geometry = F.from_json(column, GEOJSON_POLYGON_SCHEMA)
+    ring = geometry["coordinates"].getItem(0)
+    structurally_valid = (
+        (geometry["type"] == "Polygon")
+        & (F.size(geometry["coordinates"]) > 0)
+        & (F.size(ring) >= 4)
+    )
+    has_zeroed_point = F.exists(
+        ring, lambda point: (point.getItem(0) == 0.0) & (point.getItem(1) == 0.0)
+    )
+    return ring, structurally_valid, has_zeroed_point
+
+
 def geojson_polygon_is_valid(column: Column) -> Column:
     """Validate a GeoJSON Polygon serialized as a JSON string.
 
@@ -98,18 +128,8 @@ def geojson_polygon_is_valid(column: Column) -> Column:
         Boolean column, True when the geometry is null or
         structurally valid.
     """
-    geometry = F.from_json(column, GEOJSON_POLYGON_SCHEMA)
-    ring = geometry["coordinates"].getItem(0)
-    has_zeroed_point = F.exists(
-        ring, lambda point: (point.getItem(0) == 0.0) & (point.getItem(1) == 0.0)
-    )
-    valid = (
-        (geometry["type"] == "Polygon")
-        & (F.size(geometry["coordinates"]) > 0)
-        & (F.size(ring) >= 4)
-        & ~has_zeroed_point
-    )
-    return column.isNull() | valid
+    _, structurally_valid, has_zeroed_point = _polygon_checks(column)
+    return column.isNull() | (structurally_valid & ~has_zeroed_point)
 
 
 def geojson_polygon_is_in_brazil(column: Column) -> Column:
@@ -127,19 +147,11 @@ def geojson_polygon_is_in_brazil(column: Column) -> Column:
         Boolean column, False when a structurally valid polygon has at
         least one outer-ring point outside Brazil's broad bounding box.
     """
-    geometry = F.from_json(column, GEOJSON_POLYGON_SCHEMA)
-    ring = geometry["coordinates"].getItem(0)
-    structurally_valid = F.coalesce(
-        (geometry["type"] == "Polygon")
-        & (F.size(geometry["coordinates"]) > 0)
-        & (F.size(ring) >= 4),
-        F.lit(False),
+    ring, structurally_valid, has_zeroed_point = _polygon_checks(column)
+    valid_geometry = (
+        F.coalesce(structurally_valid, F.lit(False))
+        & ~F.coalesce(has_zeroed_point, F.lit(False))
     )
-    has_zeroed_point = F.coalesce(
-        F.exists(ring, lambda point: (point.getItem(0) == 0.0) & (point.getItem(1) == 0.0)),
-        F.lit(False),
-    )
-    valid_geometry = structurally_valid & ~has_zeroed_point
     has_outside_point = F.coalesce(
         F.exists(
             ring,
@@ -205,30 +217,26 @@ def apply_quarantine(df: DataFrame, checks: dict[str, Column]) -> DataFrame:
     return df.withColumn("quality_ok", F.length("dq_observations") == 0)
 
 
-def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
-    """Run the validations declared in the table config (quarantine).
-
-    Each ``schema`` entry may declare ``validations``: a list of
-    ``{"check", "reason"}`` pairs, where ``check`` is a key of
-    ``VALIDATIONS`` and ``reason`` is the label recorded in
-    `dq_observations`. Every check is wrapped null-safely (a null
-    boolean counts as invalid). Failing rows are flagged, never
-    dropped, and the failing value is nulled out - the row keeps its
-    primary key so joins still work.
+def _resolve_checks(
+    df: DataFrame, config: dict
+) -> tuple[dict[str, Column], dict[str, list[Column]]]:
+    """Build the check expressions the table config declares.
 
     Args:
-        df: DataFrame already standardized by the treatments.
+        df: DataFrame to validate.
         config: Parsed table config with `schema` entries that may
             declare `validations`.
 
     Returns:
-        The DataFrame with `dq_observations`/`quality_ok` added and
-        every failing value nulled out.
+        Two maps: reason -> null-safe boolean check (True when the
+        value is valid), and column name -> conditions that must all
+        pass for the column's value to be kept.
 
     Raises:
-        ValueError: If a declared check is not in `VALIDATIONS` -
-            the config demands exactly that check, so an unknown one
-            must abort instead of being skipped.
+        ValueError: If a declared check is not in `VALIDATIONS` or
+            references a column missing from the DataFrame - the
+            config demands exactly that check, so it must abort
+            instead of being skipped.
     """
     table = config.get("table_name", "<unknown>")
     checks: dict[str, Column] = {}
@@ -259,16 +267,56 @@ def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
             for column_name in validation.get("null_columns", validation_columns):
                 if column_name in df.columns:
                     column_conditions.setdefault(column_name, []).append(condition)
+    return checks, column_conditions
 
-    df = apply_quarantine(df, checks)
 
-    # Quarantine: null out the failing value but keep the row.
+def _null_failing_values(df: DataFrame, column_conditions: dict[str, list[Column]]) -> DataFrame:
+    """Null out values that failed a check, keeping the row.
+
+    Args:
+        df: DataFrame already flagged by `apply_quarantine`.
+        column_conditions: Maps a column to the conditions that must
+            all pass for its value to be kept.
+
+    Returns:
+        The DataFrame with every failing value nulled out.
+    """
     for name, conditions in column_conditions.items():
         passed = conditions[0]
         for condition in conditions[1:]:
             passed = passed & condition
         df = df.withColumn(name, F.when(passed, F.col(name)))
     return df
+
+
+def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
+    """Run the validations declared in the table config (quarantine).
+
+    Each ``schema`` entry may declare ``validations``: a list of
+    ``{"check", "reason"}`` pairs, where ``check`` is a key of
+    ``VALIDATIONS`` and ``reason`` is the label recorded in
+    `dq_observations`. Every check is wrapped null-safely (a null
+    boolean counts as invalid). Failing rows are flagged, never
+    dropped, and the failing value is nulled out - the row keeps its
+    primary key so joins still work.
+
+    Args:
+        df: DataFrame already standardized by the treatments.
+        config: Parsed table config with `schema` entries that may
+            declare `validations`.
+
+    Returns:
+        The DataFrame with `dq_observations`/`quality_ok` added and
+        every failing value nulled out.
+
+    Raises:
+        ValueError: If a declared check is not in `VALIDATIONS` -
+            the config demands exactly that check, so an unknown one
+            must abort instead of being skipped.
+    """
+    checks, column_conditions = _resolve_checks(df, config)
+    df = apply_quarantine(df, checks)
+    return _null_failing_values(df, column_conditions)
 
 
 def enforce_table_config(df: DataFrame, config: dict) -> DataFrame:

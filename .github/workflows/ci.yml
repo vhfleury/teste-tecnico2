@@ -19,6 +19,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/scripts:${{ github.workspace }}/pipelines:${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -30,4 +32,22 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: pytest
+      # Sedona SQL functions need the jars on the JVM classpath; the
+      # Docker image bakes them into pyspark/jars, so CI does the same.
+      - name: install sedona jars into pyspark
+        run: |
+          PYSPARK_JARS="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')"
+          curl -fSL "https://repo1.maven.org/maven2/org/apache/sedona/sedona-spark-shaded-3.5_2.12/1.9.0/sedona-spark-shaded-3.5_2.12-1.9.0.jar" \
+            -o "${PYSPARK_JARS}/sedona-spark-shaded-3.5_2.12-1.9.0.jar"
+          curl -fSL "https://repo1.maven.org/maven2/org/datasyslab/geotools-wrapper/1.9.0-33.5/geotools-wrapper-1.9.0-33.5.jar" \
+            -o "${PYSPARK_JARS}/geotools-wrapper-1.9.0-33.5.jar"
+      - name: analytics tests
+        run: pytest tests/analytics
+      - name: data_quality tests
+        run: pytest tests/data_quality
+      - name: general tests
+        run: pytest tests/general
+      - name: parser tests
+        run: pytest tests/parser
+      - name: pipelines tests
+        run: pytest tests/pipelines

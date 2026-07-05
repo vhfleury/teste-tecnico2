@@ -8,54 +8,17 @@ DATA_DIR = os.environ.get("DATA_DIR", "/opt/airflow/data")
 LAKEHOUSE_DIR = os.environ.get("LAKEHOUSE_DIR", "/opt/airflow/lakehouse")
 
 
-def raw_dir(pipeline: str) -> str:
-    """Build the raw layer base directory for a pipeline.
+def layer_dir(layer: str, dataset: str) -> str:
+    """Build a dataset's base directory in a lakehouse layer.
 
     Args:
-        pipeline: Pipeline/dataset name (e.g. `motoristas`).
+        layer: Lakehouse layer name (`raw`, `staging` or `analytics`).
+        dataset: Pipeline/dataset name (e.g. `motoristas`).
 
     Returns:
-        The raw layer base directory inside the lakehouse.
+        The dataset's base directory inside that layer.
     """
-    return f"{LAKEHOUSE_DIR}/raw/{pipeline}"
-
-
-def staging_dir(pipeline: str) -> str:
-    """Build the staging layer base directory for a pipeline.
-
-    Args:
-        pipeline: Pipeline/dataset name (e.g. `motoristas`).
-
-    Returns:
-        The staging layer base directory inside the lakehouse.
-    """
-    return f"{LAKEHOUSE_DIR}/staging/{pipeline}"
-
-
-def raw_path(base_dir: str, ingest_date: str) -> str:
-    """Build the partitioned raw path for a given ingestion date.
-
-    Args:
-        base_dir: Base directory of the dataset's raw layer.
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The raw layer path for that partition.
-    """
-    return f"{base_dir}/ingest_date={ingest_date}"
-
-
-def staging_path(base_dir: str, ingest_date: str) -> str:
-    """Build the partitioned staging path for a given ingestion date.
-
-    Args:
-        base_dir: Base directory of the dataset's staging layer.
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The staging layer path for that partition.
-    """
-    return f"{base_dir}/ingest_date={ingest_date}"
+    return f"{LAKEHOUSE_DIR}/{layer}/{dataset}"
 
 
 def load_table_config(path: str) -> dict:
@@ -90,15 +53,3 @@ def resolve_ingest_date(context: dict) -> str:
     if ds:
         return ds
     return context["dag_run"].run_after.strftime("%Y-%m-%d")
-
-
-def partition_processed(path: str) -> bool:
-    """Check whether a partition was already written successfully.
-
-    Args:
-        path: Path to the partition directory.
-
-    Returns:
-        True if a `_SUCCESS` marker exists under `path`.
-    """
-    return os.path.exists(os.path.join(path, "_SUCCESS"))

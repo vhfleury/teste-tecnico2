@@ -1,3 +1,5 @@
 pyspark==3.5.3
-redis
+delta-spark==3.3.2
+apache-sedona==1.9.0
+pandas
 pytest

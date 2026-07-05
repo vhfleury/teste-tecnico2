@@ -1,0 +1,327 @@
+{
+    "analytics_viagens_enriquecidas": [
+        {
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0001",
+            "motorista_nome": "CARLOS SILVA",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "origem_nome": "CD Sao Paulo - Guarulhos",
+            "destino_nome": "Cliente Rio de Janeiro - Centro",
+            "status": "concluida",
+            "duracao_horas": 10.5,
+            "atrasada_flag": false,
+            "mes": "2026-04"
+        },
+        {
+            "viagem_id": "VIA-000002",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0002",
+            "motorista_nome": "ANA LIMA",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0001",
+            "origem_nome": "Cliente Rio de Janeiro - Centro",
+            "destino_nome": "CD Sao Paulo - Guarulhos",
+            "status": "concluida",
+            "duracao_horas": 18.25,
+            "atrasada_flag": true,
+            "mes": "2026-04"
+        },
+        {
+            "viagem_id": "VIA-000003",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-0003",
+            "motorista_nome": "JOAO PEREIRA",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0003",
+            "origem_nome": "CD Sao Paulo - Guarulhos",
+            "destino_nome": "Posto BR-116 Registro",
+            "status": "atrasada",
+            "duracao_horas": 10.75,
+            "atrasada_flag": true,
+            "mes": "2026-04"
+        },
+        {
+            "viagem_id": "VIA-000004",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0002",
+            "motorista_nome": "ANA LIMA",
+            "geocerca_origem_id": "GEO-0003",
+            "geocerca_destino_id": "GEO-0004",
+            "origem_nome": "Posto BR-116 Registro",
+            "destino_nome": "Pedagio Dutra km 207",
+            "status": "cancelada",
+            "duracao_horas": null,
+            "atrasada_flag": false,
+            "mes": "2026-04"
+        },
+        {
+            "viagem_id": "VIA-000005",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0001",
+            "motorista_nome": "CARLOS SILVA",
+            "geocerca_origem_id": "GEO-0004",
+            "geocerca_destino_id": "GEO-0002",
+            "origem_nome": "Pedagio Dutra km 207",
+            "destino_nome": "Cliente Rio de Janeiro - Centro",
+            "status": "em_transito",
+            "duracao_horas": null,
+            "atrasada_flag": false,
+            "mes": "2026-05"
+        },
+        {
+            "viagem_id": "VIA-000006",
+            "veiculo_id": "VEI-9999",
+            "motorista_id": "MOT-0003",
+            "motorista_nome": "JOAO PEREIRA",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0003",
+            "origem_nome": "Cliente Rio de Janeiro - Centro",
+            "destino_nome": "Posto BR-116 Registro",
+            "status": "concluida",
+            "duracao_horas": 11.0,
+            "atrasada_flag": false,
+            "mes": "2026-05"
+        },
+        {
+            "viagem_id": "VIA-000007",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-9999",
+            "motorista_nome": null,
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0004",
+            "origem_nome": "CD Sao Paulo - Guarulhos",
+            "destino_nome": "Pedagio Dutra km 207",
+            "status": "concluida",
+            "duracao_horas": 11.0,
+            "atrasada_flag": false,
+            "mes": "2026-05"
+        },
+        {
+            "viagem_id": "VIA-000008",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0001",
+            "motorista_nome": "CARLOS SILVA",
+            "geocerca_origem_id": "GEO-9998",
+            "geocerca_destino_id": "GEO-0002",
+            "origem_nome": null,
+            "destino_nome": "Cliente Rio de Janeiro - Centro",
+            "status": "concluida",
+            "duracao_horas": 11.0,
+            "atrasada_flag": false,
+            "mes": "2026-06"
+        },
+        {
+            "viagem_id": "VIA-000009",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0002",
+            "motorista_nome": "ANA LIMA",
+            "geocerca_origem_id": "GEO-0003",
+            "geocerca_destino_id": "GEO-9999",
+            "origem_nome": "Posto BR-116 Registro",
+            "destino_nome": null,
+            "status": "concluida",
+            "duracao_horas": 18.0,
+            "atrasada_flag": true,
+            "mes": "2026-06"
+        },
+        {
+            "viagem_id": "VIA-000010",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-0003",
+            "motorista_nome": "JOAO PEREIRA",
+            "geocerca_origem_id": "GEO-0004",
+            "geocerca_destino_id": "GEO-0001",
+            "origem_nome": "Pedagio Dutra km 207",
+            "destino_nome": "CD Sao Paulo - Guarulhos",
+            "status": "concluida",
+            "duracao_horas": null,
+            "atrasada_flag": true,
+            "mes": null
+        },
+        {
+            "viagem_id": "VIA-000011",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0003",
+            "motorista_nome": "JOAO PEREIRA",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0004",
+            "origem_nome": "Cliente Rio de Janeiro - Centro",
+            "destino_nome": "Pedagio Dutra km 207",
+            "status": null,
+            "duracao_horas": 17.0,
+            "atrasada_flag": true,
+            "mes": "2026-05"
+        },
+        {
+            "viagem_id": "VIA-000012",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-0001",
+            "motorista_nome": "CARLOS SILVA",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "origem_nome": "CD Sao Paulo - Guarulhos",
+            "destino_nome": "Cliente Rio de Janeiro - Centro",
+            "status": "concluida",
+            "duracao_horas": 11.5,
+            "atrasada_flag": false,
+            "mes": "2026-06"
+        }
+    ],
+    "analytics_posicoes_geocercas": [
+        {
+            "posicao_id": "PGE-0001",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 08:10:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "centro_distribuicao"
+        },
+        {
+            "posicao_id": "PGE-0002",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 08:40:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": "centro_distribuicao"
+        },
+        {
+            "posicao_id": "PGE-0003",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 12:00:00",
+            "classificacao_localizacao": "em_rota",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": null
+        },
+        {
+            "posicao_id": "PGE-0004",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 17:00:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "cliente"
+        },
+        {
+            "posicao_id": "PGE-0005",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 17:20:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": "cliente"
+        },
+        {
+            "posicao_id": "PGE-0006",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 17:40:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": "cliente"
+        },
+        {
+            "posicao_id": "PGE-0007",
+            "viagem_id": "VIA-000002",
+            "veiculo_id": "VEI-0002",
+            "timestamp": "2026-04-02 06:30:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "cliente"
+        },
+        {
+            "posicao_id": "PGE-0008",
+            "viagem_id": "VIA-000002",
+            "veiculo_id": "VEI-0002",
+            "timestamp": "2026-04-02 10:00:00",
+            "classificacao_localizacao": "em_rota",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": null
+        },
+        {
+            "posicao_id": "PGE-0009",
+            "viagem_id": "VIA-000002",
+            "veiculo_id": "VEI-0002",
+            "timestamp": "2026-04-02 22:00:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "centro_distribuicao"
+        },
+        {
+            "posicao_id": "PGE-0010",
+            "viagem_id": "VIA-000002",
+            "veiculo_id": "VEI-0002",
+            "timestamp": "2026-04-02 22:24:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": "centro_distribuicao"
+        },
+        {
+            "posicao_id": "PGE-0011",
+            "viagem_id": "VIA-000003",
+            "veiculo_id": "VEI-0003",
+            "timestamp": "2026-04-05 12:00:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "posto_combustivel"
+        },
+        {
+            "posicao_id": "PGE-0012",
+            "viagem_id": "VIA-000003",
+            "veiculo_id": "VEI-0003",
+            "timestamp": "2026-04-05 12:30:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": "posto_combustivel"
+        },
+        {
+            "posicao_id": "PGE-0013",
+            "viagem_id": "VIA-000005",
+            "veiculo_id": "VEI-0002",
+            "timestamp": "2026-05-03 11:00:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "pedagio"
+        },
+        {
+            "posicao_id": "PGE-0014",
+            "viagem_id": "VIA-000005",
+            "veiculo_id": "VEI-0002",
+            "timestamp": "2026-05-03 11:06:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": "pedagio"
+        },
+        {
+            "posicao_id": "PGE-0015",
+            "viagem_id": "VIA-000007",
+            "veiculo_id": "VEI-0003",
+            "timestamp": "2026-05-12 16:00:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "pedagio"
+        }
+    ],
+    "staging_veiculos": [
+        {
+            "veiculo_id": "VEI-0001",
+            "status": "ativo"
+        },
+        {
+            "veiculo_id": "VEI-0002",
+            "status": "em_manutencao"
+        },
+        {
+            "veiculo_id": "VEI-0003",
+            "status": "ativo"
+        },
+        {
+            "veiculo_id": "VEI-0004",
+            "status": "ativo"
+        }
+    ]
+}

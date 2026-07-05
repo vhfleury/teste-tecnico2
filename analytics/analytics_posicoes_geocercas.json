@@ -1,0 +1,97 @@
+{
+    "table_name": "analytics_posicoes_geocercas",
+    "description": "GPS positions enriched with geofence membership and entry/exit events",
+    "partitioned_by": ["ingest_date"],
+    "schema": [
+        {
+            "name": "posicao_id",
+            "type": "string",
+            "example": "POS-0001"
+        },
+        {
+            "name": "viagem_id",
+            "type": "string",
+            "example": "VIA-000001"
+        },
+        {
+            "name": "veiculo_id",
+            "type": "string",
+            "example": "VEI-0001"
+        },
+        {
+            "name": "timestamp",
+            "type": "timestamp",
+            "example": "2026-04-28 10:00:00"
+        },
+        {
+            "name": "latitude",
+            "type": "double",
+            "example": -23.55
+        },
+        {
+            "name": "longitude",
+            "type": "double",
+            "example": -46.64
+        },
+        {
+            "name": "velocidade_kmh",
+            "type": "int",
+            "example": 42
+        },
+        {
+            "name": "geocerca_id",
+            "type": "string",
+            "example": "GEO-0001"
+        },
+        {
+            "name": "geocerca_nome",
+            "type": "string",
+            "example": "CD Sao Paulo"
+        },
+        {
+            "name": "geocerca_tipo",
+            "type": "string",
+            "example": "centro_distribuicao"
+        },
+        {
+            "name": "classificacao_localizacao",
+            "type": "string",
+            "example": ["em_geocerca", "em_rota"]
+        },
+        {
+            "name": "evento_entrada_geocerca",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "evento_saida_geocerca",
+            "type": "boolean",
+            "example": false
+        },
+        {
+            "name": "source_file",
+            "type": "string",
+            "example": "/opt/airflow/data/rastreamento/posicoes.parquet"
+        },
+        {
+            "name": "ingested_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:00:00"
+        },
+        {
+            "name": "dq_observations",
+            "type": "string",
+            "example": ""
+        },
+        {
+            "name": "quality_ok",
+            "type": "boolean",
+            "example": true
+        },
+        {
+            "name": "processed_at",
+            "type": "timestamp",
+            "example": "2026-07-04 12:30:00"
+        }
+    ]
+}
