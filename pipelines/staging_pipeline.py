@@ -28,8 +28,12 @@ log = logging.getLogger(__name__)
 
 PIPELINES_DIR = os.path.dirname(__file__)
 
+# Single registry of the declarative sources. ``active`` controls DAG
+# generation: a source can stay registered (configs, fixtures, tests)
+# while not being scheduled.
 STAGING_SOURCES: dict[str, dict[str, Any]] = {
     "veiculos": {
+        "active": True,
         "format": "csv",
         "path": os.path.join(DATA_DIR, "veiculos", "veiculos.csv"),
         "read_options": {"header": True, "encoding": "UTF-8"},
@@ -37,6 +41,7 @@ STAGING_SOURCES: dict[str, dict[str, Any]] = {
         "log_label": "CSV",
     },
     "viagens": {
+        "active": True,
         "format": "csv",
         "path": os.path.join(DATA_DIR, "viagens", "viagens.csv"),
         "read_options": {"header": True, "encoding": "UTF-8"},
@@ -44,6 +49,7 @@ STAGING_SOURCES: dict[str, dict[str, Any]] = {
         "log_label": "CSV",
     },
     "motoristas": {
+        "active": True,
         "format": "json",
         "path": os.path.join(DATA_DIR, "motoristas", "motoristas.json"),
         "read_options": {"multiLine": True, "primitivesAsString": True},
@@ -51,6 +57,7 @@ STAGING_SOURCES: dict[str, dict[str, Any]] = {
         "log_label": "JSON",
     },
     "posicoes": {
+        "active": True,
         "format": "parquet",
         "path": os.path.join(DATA_DIR, "rastreamento", "posicoes.parquet"),
         "read_options": {},
@@ -58,6 +65,16 @@ STAGING_SOURCES: dict[str, dict[str, Any]] = {
         "log_label": "Parquet",
     },
 }
+
+
+def active_sources() -> tuple[str, ...]:
+    """List the registered sources enabled for DAG generation.
+
+    Returns:
+        Names of the sources whose ``active`` flag is True, in
+        registry order.
+    """
+    return tuple(name for name, config in STAGING_SOURCES.items() if config["active"])
 
 
 def get_source_config(source: str) -> dict[str, Any]:

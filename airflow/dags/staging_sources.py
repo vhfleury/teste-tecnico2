@@ -24,7 +24,7 @@ from scripts.general.utils import (
     resolve_ingest_date,
 )
 from staging_pipeline import (
-    STAGING_SOURCES,
+    active_sources,
     extract_to_raw,
     get_source_config,
     raw_dir_for,
@@ -39,8 +39,6 @@ DEFAULT_ARGS = {
     "retries": 2,
     "retry_delay": pendulum.duration(minutes=1),
 }
-
-ACTIVE_SOURCES = ("veiculos", "viagens", "motoristas", "posicoes")
 
 
 def _doc_for(source: str) -> str:
@@ -135,7 +133,5 @@ def build_staging_dag(source: str):
     return staging_source_dag()
 
 
-for source_name in ACTIVE_SOURCES:
-    if source_name not in STAGING_SOURCES:
-        raise ValueError(f"Source '{source_name}' is not registered in STAGING_SOURCES")
+for source_name in active_sources():
     globals()[source_name] = build_staging_dag(source_name)
