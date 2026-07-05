@@ -17,11 +17,9 @@ import os
 from data_quality.validation import apply_table_validations, enforce_table_config
 from general.utils import (
     DATA_DIR,
+    layer_dir,
     load_table_config,
-    raw_dir,
-    raw_path,
-    staging_dir,
-    staging_path,
+    partition_path,
 )
 from parser.treatment import apply_derived_columns, apply_table_treatments
 from pyspark.sql import Column, DataFrame, SparkSession
@@ -33,8 +31,8 @@ log = logging.getLogger(__name__)
 SOURCE = "geocercas"
 
 GEOCERCAS_GEOJSON = os.path.join(DATA_DIR, SOURCE, f"{SOURCE}.geojson")
-RAW_DIR = raw_dir(SOURCE)
-STAGING_DIR = staging_dir(SOURCE)
+RAW_DIR = layer_dir("raw", SOURCE)
+STAGING_DIR = layer_dir("staging", SOURCE)
 
 # Table config (contract) of the staging table written by this pipeline.
 TABLE_CONFIG = os.path.join(os.path.dirname(__file__), f"staging_{SOURCE}.json")
@@ -78,7 +76,7 @@ def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
 
     total = df.count()
     log.info("GeoJSON read: %d features, %d columns", total, len(df.columns))
-    destination = raw_path(RAW_DIR, ingest_date)
+    destination = partition_path(RAW_DIR, ingest_date)
     log.info("Writing raw layer to %s", destination)
     df.coalesce(1).write.mode("overwrite").parquet(destination)
     log.info("Extraction finished - %d records written to raw", total)
@@ -187,7 +185,7 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
         input/output record counts and how many were flagged for
         quality.
     """
-    source = raw_path(RAW_DIR, ingest_date)
+    source = partition_path(RAW_DIR, ingest_date)
     log.info("Starting transform - reading raw layer from %s", source)
     raw = spark.read.parquet(source)
     total_in = raw.count()
@@ -203,7 +201,7 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
         config["table_name"],
     )
 
-    destination = staging_path(STAGING_DIR, ingest_date)
+    destination = partition_path(STAGING_DIR, ingest_date)
     log.info("Writing staging layer to %s", destination)
     df.coalesce(1).write.mode("overwrite").parquet(destination)
 

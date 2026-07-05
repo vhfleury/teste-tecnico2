@@ -43,18 +43,22 @@ from pipelines.geocercas.geocercas import (
     transform_to_staging,
 )
 from scripts.general.utils import (
+    partition_path,
     partition_processed,
-    raw_path,
     resolve_ingest_date,
-    staging_path,
 )
 
 log = logging.getLogger(__name__)
 
+TASK_RETRIES = 2
+RETRY_DELAY = pendulum.duration(minutes=1)
+# Cadence at which the geofence source is polled for new data.
+STAGING_SCHEDULE = "*/10 * * * *"
+
 DEFAULT_ARGS = {
     "owner": "data-eng",
-    "retries": 2,
-    "retry_delay": pendulum.duration(minutes=1),
+    "retries": TASK_RETRIES,
+    "retry_delay": RETRY_DELAY,
 }
 
 # Output of this source at the staging layer (the future gold DAG schedules on this asset).
@@ -64,7 +68,7 @@ STAGING_GEOCERCAS = Asset("staging_geocercas")
 @dag(
     dag_id="geocercas",
     description="Geofence registry ingestion and standardization (GeoJSON -> raw -> staging)",
-    schedule="*/10 * * * *",
+    schedule=STAGING_SCHEDULE,
     start_date=pendulum.datetime(2024, 1, 1, tz="UTC"),
     catchup=False,
     max_active_runs=1,
@@ -89,7 +93,7 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
-        destination = raw_path(RAW_DIR, ingest_date)
+        destination = partition_path(RAW_DIR, ingest_date)
 
         if partition_processed(destination):
             log.info(
@@ -123,7 +127,7 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
-        destination = staging_path(STAGING_DIR, ingest_date)
+        destination = partition_path(STAGING_DIR, ingest_date)
 
         if partition_processed(destination):
             log.info(

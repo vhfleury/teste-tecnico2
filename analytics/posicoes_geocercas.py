@@ -22,11 +22,9 @@ import os
 
 from data_quality.validation import enforce_table_config
 from general.utils import (
-    analytics_dir,
-    analytics_path,
+    layer_dir,
     load_table_config,
-    staging_dir,
-    staging_path,
+    partition_path,
 )
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
@@ -37,9 +35,9 @@ log = logging.getLogger(__name__)
 SOURCE = "posicoes_geocercas"
 
 # Staging inputs consumed by this analytics table.
-STAGING_POSICOES_DIR = staging_dir("posicoes")
-STAGING_GEOCERCAS_DIR = staging_dir("geocercas")
-ANALYTICS_DIR = analytics_dir(SOURCE)
+STAGING_POSICOES_DIR = layer_dir("staging", "posicoes")
+STAGING_GEOCERCAS_DIR = layer_dir("staging", "geocercas")
+ANALYTICS_DIR = layer_dir("analytics", SOURCE)
 
 # Table config (contract) of the analytics table written by this module.
 TABLE_CONFIG = os.path.join(os.path.dirname(__file__), f"analytics_{SOURCE}.json")
@@ -437,8 +435,8 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
         count, how many positions fell inside a geofence and how many
         entry/exit events were flagged.
     """
-    positions_path = staging_path(STAGING_POSICOES_DIR, ingest_date)
-    geofences_path = staging_path(STAGING_GEOCERCAS_DIR, ingest_date)
+    positions_path = partition_path(STAGING_POSICOES_DIR, ingest_date)
+    geofences_path = partition_path(STAGING_GEOCERCAS_DIR, ingest_date)
     log.info("Reading staging positions from %s", positions_path)
     positions = spark.read.parquet(positions_path)
     log.info("Reading staging geofences from %s", geofences_path)
@@ -447,7 +445,7 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     config = load_table_config(TABLE_CONFIG)
     df = build_analytics(positions, geofences, config)
 
-    destination = analytics_path(ANALYTICS_DIR, ingest_date)
+    destination = partition_path(ANALYTICS_DIR, ingest_date)
     log.info("Writing analytics layer to %s", destination)
     df.coalesce(1).write.mode("overwrite").parquet(destination)
 

@@ -8,77 +8,28 @@ DATA_DIR = os.environ.get("DATA_DIR", "/opt/airflow/data")
 LAKEHOUSE_DIR = os.environ.get("LAKEHOUSE_DIR", "/opt/airflow/lakehouse")
 
 
-def raw_dir(pipeline: str) -> str:
-    """Build the raw layer base directory for a pipeline.
+def layer_dir(layer: str, dataset: str) -> str:
+    """Build a dataset's base directory in a lakehouse layer.
 
     Args:
-        pipeline: Pipeline/dataset name (e.g. `motoristas`).
+        layer: Lakehouse layer name (`raw`, `staging` or `analytics`).
+        dataset: Pipeline/dataset name (e.g. `motoristas`).
 
     Returns:
-        The raw layer base directory inside the lakehouse.
+        The dataset's base directory inside that layer.
     """
-    return f"{LAKEHOUSE_DIR}/raw/{pipeline}"
+    return f"{LAKEHOUSE_DIR}/{layer}/{dataset}"
 
 
-def staging_dir(pipeline: str) -> str:
-    """Build the staging layer base directory for a pipeline.
+def partition_path(base_dir: str, ingest_date: str) -> str:
+    """Build the partitioned path for a given ingestion date.
 
     Args:
-        pipeline: Pipeline/dataset name (e.g. `motoristas`).
-
-    Returns:
-        The staging layer base directory inside the lakehouse.
-    """
-    return f"{LAKEHOUSE_DIR}/staging/{pipeline}"
-
-
-def analytics_dir(dataset: str) -> str:
-    """Build the analytics layer base directory for a dataset.
-
-    Args:
-        dataset: Analytics dataset name (e.g. `posicoes_geocercas`).
-
-    Returns:
-        The analytics layer base directory inside the lakehouse.
-    """
-    return f"{LAKEHOUSE_DIR}/analytics/{dataset}"
-
-
-def raw_path(base_dir: str, ingest_date: str) -> str:
-    """Build the partitioned raw path for a given ingestion date.
-
-    Args:
-        base_dir: Base directory of the dataset's raw layer.
+        base_dir: Base directory of the dataset in its layer.
         ingest_date: Ingestion date in `YYYY-MM-DD` format.
 
     Returns:
-        The raw layer path for that partition.
-    """
-    return f"{base_dir}/ingest_date={ingest_date}"
-
-
-def analytics_path(base_dir: str, ingest_date: str) -> str:
-    """Build the partitioned analytics path for a given ingestion date.
-
-    Args:
-        base_dir: Base directory of the dataset's analytics layer.
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The analytics layer path for that partition.
-    """
-    return f"{base_dir}/ingest_date={ingest_date}"
-
-
-def staging_path(base_dir: str, ingest_date: str) -> str:
-    """Build the partitioned staging path for a given ingestion date.
-
-    Args:
-        base_dir: Base directory of the dataset's staging layer.
-        ingest_date: Ingestion date in `YYYY-MM-DD` format.
-
-    Returns:
-        The staging layer path for that partition.
+        The `ingest_date` partition path under `base_dir`.
     """
     return f"{base_dir}/ingest_date={ingest_date}"
 

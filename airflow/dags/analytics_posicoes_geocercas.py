@@ -37,14 +37,17 @@ from airflow.sdk import Asset, dag, task
 
 from analytics.posicoes_geocercas import ANALYTICS_DIR, transform_to_analytics
 from connections.spark_session import run_spark
-from scripts.general.utils import analytics_path, partition_processed, resolve_ingest_date
+from scripts.general.utils import partition_path, partition_processed, resolve_ingest_date
 
 log = logging.getLogger(__name__)
 
+TASK_RETRIES = 2
+RETRY_DELAY = pendulum.duration(minutes=1)
+
 DEFAULT_ARGS = {
     "owner": "data-eng",
-    "retries": 2,
-    "retry_delay": pendulum.duration(minutes=1),
+    "retries": TASK_RETRIES,
+    "retry_delay": RETRY_DELAY,
 }
 
 # Staging inputs this DAG schedules on (published by the staging DAGs).
@@ -82,7 +85,7 @@ def analytics_posicoes_geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
-        destination = analytics_path(ANALYTICS_DIR, ingest_date)
+        destination = partition_path(ANALYTICS_DIR, ingest_date)
 
         if partition_processed(destination):
             log.info(
