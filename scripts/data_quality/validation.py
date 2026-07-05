@@ -217,30 +217,26 @@ def apply_quarantine(df: DataFrame, checks: dict[str, Column]) -> DataFrame:
     return df.withColumn("quality_ok", F.length("dq_observations") == 0)
 
 
-def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
-    """Run the validations declared in the table config (quarantine).
-
-    Each ``schema`` entry may declare ``validations``: a list of
-    ``{"check", "reason"}`` pairs, where ``check`` is a key of
-    ``VALIDATIONS`` and ``reason`` is the label recorded in
-    `dq_observations`. Every check is wrapped null-safely (a null
-    boolean counts as invalid). Failing rows are flagged, never
-    dropped, and the failing value is nulled out - the row keeps its
-    primary key so joins still work.
+def _resolve_checks(
+    df: DataFrame, config: dict
+) -> tuple[dict[str, Column], dict[str, list[Column]]]:
+    """Build the check expressions the table config declares.
 
     Args:
-        df: DataFrame already standardized by the treatments.
+        df: DataFrame to validate.
         config: Parsed table config with `schema` entries that may
             declare `validations`.
 
     Returns:
-        The DataFrame with `dq_observations`/`quality_ok` added and
-        every failing value nulled out.
+        Two maps: reason -> null-safe boolean check (True when the
+        value is valid), and column name -> conditions that must all
+        pass for the column's value to be kept.
 
     Raises:
-        ValueError: If a declared check is not in `VALIDATIONS` -
-            the config demands exactly that check, so an unknown one
-            must abort instead of being skipped.
+        ValueError: If a declared check is not in `VALIDATIONS` or
+            references a column missing from the DataFrame - the
+            config demands exactly that check, so it must abort
+            instead of being skipped.
     """
     table = config.get("table_name", "<unknown>")
     checks: dict[str, Column] = {}
@@ -271,16 +267,56 @@ def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
             for column_name in validation.get("null_columns", validation_columns):
                 if column_name in df.columns:
                     column_conditions.setdefault(column_name, []).append(condition)
+    return checks, column_conditions
 
-    df = apply_quarantine(df, checks)
 
-    # Quarantine: null out the failing value but keep the row.
+def _null_failing_values(df: DataFrame, column_conditions: dict[str, list[Column]]) -> DataFrame:
+    """Null out values that failed a check, keeping the row.
+
+    Args:
+        df: DataFrame already flagged by `apply_quarantine`.
+        column_conditions: Maps a column to the conditions that must
+            all pass for its value to be kept.
+
+    Returns:
+        The DataFrame with every failing value nulled out.
+    """
     for name, conditions in column_conditions.items():
         passed = conditions[0]
         for condition in conditions[1:]:
             passed = passed & condition
         df = df.withColumn(name, F.when(passed, F.col(name)))
     return df
+
+
+def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
+    """Run the validations declared in the table config (quarantine).
+
+    Each ``schema`` entry may declare ``validations``: a list of
+    ``{"check", "reason"}`` pairs, where ``check`` is a key of
+    ``VALIDATIONS`` and ``reason`` is the label recorded in
+    `dq_observations`. Every check is wrapped null-safely (a null
+    boolean counts as invalid). Failing rows are flagged, never
+    dropped, and the failing value is nulled out - the row keeps its
+    primary key so joins still work.
+
+    Args:
+        df: DataFrame already standardized by the treatments.
+        config: Parsed table config with `schema` entries that may
+            declare `validations`.
+
+    Returns:
+        The DataFrame with `dq_observations`/`quality_ok` added and
+        every failing value nulled out.
+
+    Raises:
+        ValueError: If a declared check is not in `VALIDATIONS` -
+            the config demands exactly that check, so an unknown one
+            must abort instead of being skipped.
+    """
+    checks, column_conditions = _resolve_checks(df, config)
+    df = apply_quarantine(df, checks)
+    return _null_failing_values(df, column_conditions)
 
 
 def enforce_table_config(df: DataFrame, config: dict) -> DataFrame:
