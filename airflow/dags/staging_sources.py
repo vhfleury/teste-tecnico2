@@ -19,10 +19,9 @@ from airflow.sdk import Asset, dag, task
 
 from connections.spark_session import run_spark
 from scripts.general.utils import (
+    partition_path,
     partition_processed,
-    raw_path,
     resolve_ingest_date,
-    staging_path,
 )
 from staging_pipeline import (
     STAGING_SOURCES,
@@ -90,7 +89,7 @@ def build_staging_dag(source: str):
         def extract_to_raw_task(**context) -> dict:
             """Read the source input and write the raw partition."""
             ingest_date = resolve_ingest_date(context)
-            destination = raw_path(raw_base_dir, ingest_date)
+            destination = partition_path(raw_base_dir, ingest_date)
 
             if partition_processed(destination):
                 log.info(
@@ -112,7 +111,7 @@ def build_staging_dag(source: str):
         def transform_to_staging_task(**context) -> dict:
             """Read raw, apply the table config and write staging."""
             ingest_date = resolve_ingest_date(context)
-            destination = staging_path(staging_base_dir, ingest_date)
+            destination = partition_path(staging_base_dir, ingest_date)
 
             if partition_processed(destination):
                 log.info(

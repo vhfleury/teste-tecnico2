@@ -43,10 +43,9 @@ from pipelines.geocercas.geocercas import (
     transform_to_staging,
 )
 from scripts.general.utils import (
+    partition_path,
     partition_processed,
-    raw_path,
     resolve_ingest_date,
-    staging_path,
 )
 
 log = logging.getLogger(__name__)
@@ -89,7 +88,7 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
-        destination = raw_path(RAW_DIR, ingest_date)
+        destination = partition_path(RAW_DIR, ingest_date)
 
         if partition_processed(destination):
             log.info(
@@ -123,7 +122,7 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
-        destination = staging_path(STAGING_DIR, ingest_date)
+        destination = partition_path(STAGING_DIR, ingest_date)
 
         if partition_processed(destination):
             log.info(

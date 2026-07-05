@@ -16,11 +16,9 @@ from typing import Any
 from data_quality.validation import apply_table_validations, enforce_table_config
 from general.utils import (
     DATA_DIR,
+    layer_dir,
     load_table_config,
-    raw_dir,
-    raw_path,
-    staging_dir,
-    staging_path,
+    partition_path,
 )
 from parser.treatment import apply_derived_columns, apply_table_treatments
 from pyspark.sql import DataFrame, SparkSession
@@ -86,13 +84,13 @@ def get_source_config(source: str) -> dict[str, Any]:
 def raw_dir_for(source: str) -> str:
     """Build the raw layer base directory for a registered source."""
     get_source_config(source)
-    return raw_dir(source)
+    return layer_dir("raw", source)
 
 
 def staging_dir_for(source: str) -> str:
     """Build the staging layer base directory for a registered source."""
     get_source_config(source)
-    return staging_dir(source)
+    return layer_dir("staging", source)
 
 
 def table_config_path(source: str) -> str:
@@ -146,7 +144,7 @@ def extract_to_raw(spark: SparkSession, source: str, ingest_date: str) -> dict:
 
     total = df.count()
     log.info("%s read for %s: %d records, %d columns", log_label, source, total, len(df.columns))
-    destination = raw_path(raw_dir_for(source), ingest_date)
+    destination = partition_path(raw_dir_for(source), ingest_date)
     log.info("Writing raw layer for %s to %s", source, destination)
     df.coalesce(1).write.mode("overwrite").parquet(destination)
     log.info("Extraction finished for %s - %d records written to raw", source, total)
@@ -185,7 +183,7 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
         input/output record counts and how many were flagged for
         quality.
     """
-    raw_source = raw_path(raw_dir_for(source), ingest_date)
+    raw_source = partition_path(raw_dir_for(source), ingest_date)
     log.info("Starting transform for %s - reading raw layer from %s", source, raw_source)
     raw = spark.read.parquet(raw_source)
     total_in = raw.count()
@@ -199,7 +197,7 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
         config["table_name"],
     )
 
-    destination = staging_path(staging_dir_for(source), ingest_date)
+    destination = partition_path(staging_dir_for(source), ingest_date)
     log.info("Writing staging layer for %s to %s", source, destination)
     df.coalesce(1).write.mode("overwrite").parquet(destination)
 
