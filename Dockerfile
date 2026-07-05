@@ -20,3 +20,14 @@ USER airflow
 
 COPY requirements.txt /requirements.txt
 RUN pip install --no-cache-dir -r /requirements.txt
+
+# Delta Lake jars are baked into pyspark's jars/ at build time so gold-layer
+# sessions never download dependencies at runtime (no Ivy resolution per task).
+ARG DELTA_VERSION=3.3.2
+ARG DELTA_MAVEN_URL=https://repo1.maven.org/maven2/io/delta
+
+RUN PYSPARK_JARS="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "jars"))')" \
+    && curl -fSL "${DELTA_MAVEN_URL}/delta-spark_2.12/${DELTA_VERSION}/delta-spark_2.12-${DELTA_VERSION}.jar" \
+        -o "${PYSPARK_JARS}/delta-spark_2.12-${DELTA_VERSION}.jar" \
+    && curl -fSL "${DELTA_MAVEN_URL}/delta-storage/${DELTA_VERSION}/delta-storage-${DELTA_VERSION}.jar" \
+        -o "${PYSPARK_JARS}/delta-storage-${DELTA_VERSION}.jar"
