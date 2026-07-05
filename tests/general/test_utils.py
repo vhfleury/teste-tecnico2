@@ -8,8 +8,6 @@ from general import utils
 from general.utils import (
     layer_dir,
     load_table_config,
-    partition_path,
-    partition_processed,
     resolve_ingest_date,
 )
 
@@ -19,13 +17,6 @@ def test_layer_dir_builds_dataset_directory_in_layer(monkeypatch, layer):
     monkeypatch.setattr(utils, "LAKEHOUSE_DIR", "/lakehouse")
 
     assert layer_dir(layer, "motoristas") == f"/lakehouse/{layer}/motoristas"
-
-
-def test_partition_path_builds_partition_for_ingest_date():
-    assert (
-        partition_path("/lakehouse/raw/motoristas", "2024-01-01")
-        == "/lakehouse/raw/motoristas/ingest_date=2024-01-01"
-    )
 
 
 def test_resolve_ingest_date_uses_ds_when_present():
@@ -41,21 +32,6 @@ def test_resolve_ingest_date_falls_back_to_run_after():
     }
 
     assert resolve_ingest_date(context) == "2024-02-03"
-
-
-def test_partition_processed_requires_success_marker(tmp_path):
-    partition = tmp_path / "ingest_date=2024-01-01"
-    partition.mkdir()
-
-    assert not partition_processed(str(partition))
-
-    (partition / "_SUCCESS").touch()
-
-    assert partition_processed(str(partition))
-
-
-def test_partition_processed_missing_directory(tmp_path):
-    assert not partition_processed(str(tmp_path / "does_not_exist"))
 
 
 def test_load_table_config_parses_json(tmp_path):

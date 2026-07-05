@@ -41,7 +41,7 @@ from airflow.sdk import Asset, dag, task
 
 from analytics.viagens_enriquecidas import ANALYTICS_DIR, transform_to_analytics
 from connections.spark_session import run_spark
-from scripts.general.delta_io import gold_partition_processed
+from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import resolve_ingest_date
 
 log = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ def analytics_viagens_enriquecidas():
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
 
-        if gold_partition_processed(ANALYTICS_DIR, ingest_date):
+        if delta_partition_processed(ANALYTICS_DIR, ingest_date):
             log.info(
                 "Analytics for %s already processed (%s) - skipping enrichment",
                 ingest_date,

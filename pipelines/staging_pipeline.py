@@ -4,7 +4,9 @@ This module owns the shared raw -> staging flow for declarative
 sources. Source-specific rules stay in ``staging_<source>.json``;
 this runner only knows how to read each raw input format, add runtime
 metadata, apply the generic treatment/validation engine and write the
-staging partition.
+staging partition. Both layers are Delta tables: every write replaces
+only its own ``ingest_date`` partition and sets the processed marker
+right after the commit.
 """
 from __future__ import annotations
 
@@ -14,11 +16,15 @@ from copy import deepcopy
 from typing import Any
 
 from data_quality.validation import apply_table_validations, enforce_table_config
+from general.delta_io import (
+    mark_delta_partition_processed,
+    read_delta_partition,
+    write_delta_partition,
+)
 from general.utils import (
     DATA_DIR,
     layer_dir,
     load_table_config,
-    partition_path,
 )
 from parser.treatment import apply_derived_columns, apply_table_treatments
 from pyspark.sql import DataFrame, SparkSession
@@ -139,14 +145,15 @@ def extract_to_raw(spark: SparkSession, source: str, ingest_date: str) -> dict:
     """Read a registered input source and write it to raw unchanged.
 
     Args:
-        spark: Active SparkSession.
+        spark: Active SparkSession (must be created with
+            ``enable_delta=True``).
         source: Source name registered in ``STAGING_SOURCES``.
         ingest_date: Ingestion date in ``YYYY-MM-DD`` format, used
             to partition the raw layer.
 
     Returns:
-        Metrics about the write: layer name, destination path and
-        record count.
+        Metrics about the write: layer name, destination table,
+        ingestion date and record count.
     """
     source_config = get_source_config(source)
     source_path = source_config["path"]
@@ -161,12 +168,19 @@ def extract_to_raw(spark: SparkSession, source: str, ingest_date: str) -> dict:
 
     total = df.count()
     log.info("%s read for %s: %d records, %d columns", log_label, source, total, len(df.columns))
-    destination = partition_path(raw_dir_for(source), ingest_date)
-    log.info("Writing raw layer for %s to %s", source, destination)
-    df.coalesce(1).write.mode("overwrite").parquet(destination)
+    destination = raw_dir_for(source)
+    log.info("Writing raw layer for %s to %s (Delta)", source, destination)
+    write_delta_partition(df, destination, ingest_date)
+    mark_delta_partition_processed(destination, ingest_date)
     log.info("Extraction finished for %s - %d records written to raw", source, total)
 
-    return {"layer": "raw", "source": source, "path": destination, "records": total}
+    return {
+        "layer": "raw",
+        "source": source,
+        "path": destination,
+        "ingest_date": ingest_date,
+        "records": total,
+    }
 
 
 def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
@@ -190,19 +204,25 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
     """Read raw, apply the source table config and write staging.
 
     Args:
-        spark: Active SparkSession.
+        spark: Active SparkSession (must be created with
+            ``enable_delta=True``).
         source: Source name registered in ``STAGING_SOURCES``.
         ingest_date: Ingestion date in ``YYYY-MM-DD`` format, used
             to locate raw and staging partitions.
 
     Returns:
-        Metrics about the write: layer name, destination path,
-        input/output record counts and how many were flagged for
-        quality.
+        Metrics about the write: layer name, destination table,
+        ingestion date, input/output record counts and how many were
+        flagged for quality.
     """
-    raw_source = partition_path(raw_dir_for(source), ingest_date)
-    log.info("Starting transform for %s - reading raw layer from %s", source, raw_source)
-    raw = spark.read.parquet(raw_source)
+    raw_source = raw_dir_for(source)
+    log.info(
+        "Starting transform for %s - reading raw layer from %s (ingest_date=%s)",
+        source,
+        raw_source,
+        ingest_date,
+    )
+    raw = read_delta_partition(spark, raw_source, ingest_date)
     total_in = raw.count()
     log.info("Raw layer read for %s: %d records", source, total_in)
 
@@ -214,9 +234,10 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
         config["table_name"],
     )
 
-    destination = partition_path(staging_dir_for(source), ingest_date)
-    log.info("Writing staging layer for %s to %s", source, destination)
-    df.coalesce(1).write.mode("overwrite").parquet(destination)
+    destination = staging_dir_for(source)
+    log.info("Writing staging layer for %s to %s (Delta)", source, destination)
+    write_delta_partition(df, destination, ingest_date)
+    mark_delta_partition_processed(destination, ingest_date)
 
     total_out = df.count()
     flagged = df.filter(~F.col("quality_ok")).count()
@@ -246,6 +267,7 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
         "layer": "staging",
         "source": source,
         "path": destination,
+        "ingest_date": ingest_date,
         "records_in": total_in,
         "records_out": total_out,
         "records_flagged": flagged,

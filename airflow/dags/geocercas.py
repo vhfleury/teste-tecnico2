@@ -10,19 +10,20 @@ The DAG is thin on purpose: all PySpark logic lives in
 ``pipelines/geocercas/geocercas.py`` and the staging contract
 (columns, treatments, validations, key) in ``staging_geocercas.json``.
 
-Each run writes to its own ``ingest_date`` partition (the run's
-``logical_date``). Different dates coexist; reprocessing the same date only
-overwrites that partition.
+Both layers are Delta tables: each run atomically replaces only its own
+``ingest_date`` partition (``replaceWhere``, the run's ``logical_date``).
+Different dates coexist; reprocessing the same date only overwrites that
+partition.
 
 **Idempotency via pre-check:** before doing any work, each task checks
-whether its target partition was already written successfully (a
-``_SUCCESS`` marker). If it exists, the task is skipped
+the partition's processed marker (written under ``_markers/`` after each
+Delta commit). If it exists, the task is skipped
 (``AirflowSkipException``) instead of reprocessing. The transform task uses
 ``trigger_rule="none_failed"`` so it can still run its own check even when
 the extraction task was skipped because raw already existed.
 
-Tasks communicate through the persisted layer (the raw Parquet), not XCom:
-each one reads/writes the lakehouse and can be re-run independently.
+Tasks communicate through the persisted layer (the raw Delta table), not
+XCom: each one reads/writes the lakehouse and can be re-run independently.
 
 The final task publishes the ``staging_geocercas`` Asset, the data-aware
 trigger for the future gold DAG (geospatial enrichment + trip fact table).
@@ -42,11 +43,8 @@ from pipelines.geocercas.geocercas import (
     extract_to_raw,
     transform_to_staging,
 )
-from scripts.general.utils import (
-    partition_path,
-    partition_processed,
-    resolve_ingest_date,
-)
+from scripts.general.delta_io import delta_partition_processed
+from scripts.general.utils import resolve_ingest_date
 
 log = logging.getLogger(__name__)
 
@@ -93,17 +91,16 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
-        destination = partition_path(RAW_DIR, ingest_date)
 
-        if partition_processed(destination):
+        if delta_partition_processed(RAW_DIR, ingest_date):
             log.info(
                 "Raw for %s already processed (%s) - skipping extraction",
                 ingest_date,
-                destination,
+                RAW_DIR,
             )
             raise AirflowSkipException(f"raw ingest_date={ingest_date} already exists")
 
-        metrics = run_spark("geocercas_extract", extract_to_raw, ingest_date)
+        metrics = run_spark("geocercas_extract", extract_to_raw, ingest_date, enable_delta=True)
         log.info("Raw layer written: %s", metrics)
         return metrics
 
@@ -127,17 +124,18 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
-        destination = partition_path(STAGING_DIR, ingest_date)
 
-        if partition_processed(destination):
+        if delta_partition_processed(STAGING_DIR, ingest_date):
             log.info(
                 "Staging for %s already processed (%s) - skipping transform",
                 ingest_date,
-                destination,
+                STAGING_DIR,
             )
             raise AirflowSkipException(f"staging ingest_date={ingest_date} already exists")
 
-        metrics = run_spark("geocercas_transform", transform_to_staging, ingest_date)
+        metrics = run_spark(
+            "geocercas_transform", transform_to_staging, ingest_date, enable_delta=True
+        )
         log.info(
             "Staging layer written: %s records (%s flagged for quality)",
             metrics["records_out"],

@@ -15,11 +15,15 @@ import logging
 import os
 
 from data_quality.validation import apply_table_validations, enforce_table_config
+from general.delta_io import (
+    mark_delta_partition_processed,
+    read_delta_partition,
+    write_delta_partition,
+)
 from general.utils import (
     DATA_DIR,
     layer_dir,
     load_table_config,
-    partition_path,
 )
 from parser.treatment import apply_derived_columns, apply_table_treatments
 from pyspark.sql import Column, DataFrame, SparkSession
@@ -55,13 +59,14 @@ def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
     Typing and flattening happen in the staging stage.
 
     Args:
-        spark: Active SparkSession.
+        spark: Active SparkSession (must be created with
+            ``enable_delta=True``).
         ingest_date: Ingestion date in `YYYY-MM-DD` format, used
             to partition the raw layer.
 
     Returns:
-        Metrics about the write: layer name, destination path and
-        record count.
+        Metrics about the write: layer name, destination table,
+        ingestion date and record count.
     """
     log.info("Starting extraction - reading GeoJSON from %s", GEOCERCAS_GEOJSON)
     collection = (
@@ -76,12 +81,12 @@ def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
 
     total = df.count()
     log.info("GeoJSON read: %d features, %d columns", total, len(df.columns))
-    destination = partition_path(RAW_DIR, ingest_date)
-    log.info("Writing raw layer to %s", destination)
-    df.coalesce(1).write.mode("overwrite").parquet(destination)
+    log.info("Writing raw layer to %s (Delta)", RAW_DIR)
+    write_delta_partition(df, RAW_DIR, ingest_date)
+    mark_delta_partition_processed(RAW_DIR, ingest_date)
     log.info("Extraction finished - %d records written to raw", total)
 
-    return {"layer": "raw", "path": destination, "records": total}
+    return {"layer": "raw", "path": RAW_DIR, "ingest_date": ingest_date, "records": total}
 
 
 def _struct_fields(df: DataFrame, column: str) -> list[str]:
@@ -175,19 +180,23 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
     """Read the raw layer, clean/validate it and write staging.
 
     Args:
-        spark: Active SparkSession.
+        spark: Active SparkSession (must be created with
+            ``enable_delta=True``).
         ingest_date: Ingestion date in `YYYY-MM-DD` format, used
             to locate the raw partition and to partition the
             staging layer.
 
     Returns:
-        Metrics about the write: layer name, destination path,
-        input/output record counts and how many were flagged for
-        quality.
+        Metrics about the write: layer name, destination table,
+        ingestion date, input/output record counts and how many were
+        flagged for quality.
     """
-    source = partition_path(RAW_DIR, ingest_date)
-    log.info("Starting transform - reading raw layer from %s", source)
-    raw = spark.read.parquet(source)
+    log.info(
+        "Starting transform - reading raw layer from %s (ingest_date=%s)",
+        RAW_DIR,
+        ingest_date,
+    )
+    raw = read_delta_partition(spark, RAW_DIR, ingest_date)
     total_in = raw.count()
     log.info("Raw layer read: %d records", total_in)
 
@@ -201,9 +210,9 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
         config["table_name"],
     )
 
-    destination = partition_path(STAGING_DIR, ingest_date)
-    log.info("Writing staging layer to %s", destination)
-    df.coalesce(1).write.mode("overwrite").parquet(destination)
+    log.info("Writing staging layer to %s (Delta)", STAGING_DIR)
+    write_delta_partition(df, STAGING_DIR, ingest_date)
+    mark_delta_partition_processed(STAGING_DIR, ingest_date)
 
     total_out = df.count()
     flagged = df.filter(~F.col("quality_ok")).count()
@@ -230,7 +239,8 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
     )
     return {
         "layer": "staging",
-        "path": destination,
+        "path": STAGING_DIR,
+        "ingest_date": ingest_date,
         "records_in": total_in,
         "records_out": total_out,
         "records_flagged": flagged,

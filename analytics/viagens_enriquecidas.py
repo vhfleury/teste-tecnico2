@@ -26,11 +26,14 @@ import logging
 import os
 
 from data_quality.validation import enforce_table_config
-from general.delta_io import mark_gold_partition_processed, write_delta_partition
+from general.delta_io import (
+    mark_delta_partition_processed,
+    read_delta_partition,
+    write_delta_partition,
+)
 from general.utils import (
     layer_dir,
     load_table_config,
-    partition_path,
 )
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -314,8 +317,8 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     """Read staging inputs, build the enriched trips and write the partition.
 
     The output is a Delta table: the write atomically replaces only
-    this `ingest_date` partition and the gold marker is set right
-    after the commit (Delta writes no `_SUCCESS` file).
+    this `ingest_date` partition and the marker is set right after
+    the commit (Delta writes no `_SUCCESS` file).
 
     Args:
         spark: Active SparkSession (must be created with
@@ -338,9 +341,8 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     }
     frames = {}
     for name, base_dir in staging_inputs.items():
-        path = partition_path(base_dir, ingest_date)
-        log.info("Reading staging %s from %s", name, path)
-        frames[name] = spark.read.parquet(path)
+        log.info("Reading staging %s from %s (ingest_date=%s)", name, base_dir, ingest_date)
+        frames[name] = read_delta_partition(spark, base_dir, ingest_date)
 
     config = load_table_config(TABLE_CONFIG)
     df = build_analytics(
@@ -354,7 +356,7 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
 
     log.info("Writing analytics layer to %s (Delta)", ANALYTICS_DIR)
     write_delta_partition(df, ANALYTICS_DIR, ingest_date)
-    mark_gold_partition_processed(ANALYTICS_DIR, ingest_date)
+    mark_delta_partition_processed(ANALYTICS_DIR, ingest_date)
 
     total = df.count()
     flagged = df.filter(~F.col("quality_ok")).count()

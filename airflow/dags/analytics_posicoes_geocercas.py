@@ -15,13 +15,14 @@ Data-aware scheduling: instead of a cron, the DAG runs when the
 the staging DAGs, so analytics never reads a partition that has not
 been written yet.
 
-Each run writes to its own ``ingest_date`` partition (the run's
-``logical_date``). Different dates coexist; reprocessing the same date only
-overwrites that partition.
+The output is a Delta table: each run atomically replaces only its own
+``ingest_date`` partition (``replaceWhere``, the run's ``logical_date``).
+Different dates coexist; reprocessing the same date only overwrites that
+partition.
 
 **Idempotency via pre-check:** before doing any work, the task checks
-whether its target partition was already written successfully (a
-``_SUCCESS`` marker). If it exists, the task is skipped
+the partition's processed marker (written under ``_markers/`` after the
+Delta commit). If it exists, the task is skipped
 (``AirflowSkipException``) instead of reprocessing.
 
 The task publishes the ``analytics_posicoes_geocercas`` Asset, the
@@ -37,7 +38,8 @@ from airflow.sdk import Asset, dag, task
 
 from analytics.posicoes_geocercas import ANALYTICS_DIR, transform_to_analytics
 from connections.spark_session import run_spark
-from scripts.general.utils import partition_path, partition_processed, resolve_ingest_date
+from scripts.general.delta_io import delta_partition_processed
+from scripts.general.utils import resolve_ingest_date
 
 log = logging.getLogger(__name__)
 
@@ -85,13 +87,12 @@ def analytics_posicoes_geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
-        destination = partition_path(ANALYTICS_DIR, ingest_date)
 
-        if partition_processed(destination):
+        if delta_partition_processed(ANALYTICS_DIR, ingest_date):
             log.info(
                 "Analytics for %s already processed (%s) - skipping enrichment",
                 ingest_date,
-                destination,
+                ANALYTICS_DIR,
             )
             raise AirflowSkipException(f"analytics ingest_date={ingest_date} already exists")
 
@@ -99,6 +100,7 @@ def analytics_posicoes_geocercas():
             "analytics_posicoes_geocercas_transform",
             transform_to_analytics,
             ingest_date,
+            enable_delta=True,
         )
         log.info(
             "Analytics layer written: %s records, %s entry events, %s exit events",
