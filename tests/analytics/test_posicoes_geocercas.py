@@ -2,11 +2,11 @@
 
 Analytics has exclusive treatment (joins and business rules live in
 code, not in the config), so it is not covered by the generic staging
-golden test. Two tests: a unit check of the point-in-polygon
-primitive (inside, outside and boundary points) and a golden test
-that runs the full `build_analytics` chain over the input fixture —
-one key per staging table consumed — and compares the result with the
-frozen expected output, keyed by `posicao_id`.
+golden test. Two tests: a spatial check of the Sedona-based matcher
+(inside, outside and boundary points) and a golden test that runs the
+full `build_analytics` chain over the input fixture — one key per
+staging table consumed — and compares the result with the frozen
+expected output, keyed by `posicao_id`.
 """
 import json
 import os
@@ -15,8 +15,8 @@ from general.utils import load_table_config
 from pyspark.sql import functions as F
 
 from analytics.posicoes_geocercas import (
-    _point_is_inside_geojson_polygon,
     build_analytics,
+    match_positions_to_geofences,
 )
 from tests.pipelines.diff import assert_matches_expected, dataframe_to_rows
 
@@ -48,16 +48,65 @@ def load_fixture(file_name: str) -> dict:
         return json.load(file)
 
 
-def test_point_in_polygon_handles_inside_outside_and_boundary_points():
+def _position_row(posicao_id: str, latitude: float, longitude: float) -> dict:
+    return {
+        "posicao_id": posicao_id,
+        "viagem_id": "VIA-001",
+        "veiculo_id": "VEI-001",
+        "timestamp": "2026-04-28 10:00:00",
+        "latitude": latitude,
+        "longitude": longitude,
+        "velocidade_kmh": 10,
+        "source_file": "test",
+        "ingested_at": "2026-07-04 12:00:00",
+        "dq_observations": "",
+        "quality_ok": True,
+    }
+
+
+def test_spatial_match_handles_inside_outside_and_boundary_points(spark):
     geometry = (
         '{"type":"Polygon","coordinates":[[[-46.65,-23.56],[-46.63,-23.56],'
         '[-46.63,-23.54],[-46.65,-23.54],[-46.65,-23.56]]]}'
     )
+    geofences = spark.createDataFrame(
+        [
+            {
+                "geocerca_id": "GEO-A",
+                "nome": "Terminal A",
+                "tipo": "centro_distribuicao",
+                "uf": "SP",
+                "raio_km": 1.0,
+                "ativo": True,
+                "geometry": geometry,
+                "source_file": "test",
+                "ingested_at": "2026-07-04 12:00:00",
+                "dq_observations": "",
+                "quality_ok": True,
+            }
+        ],
+        GEOFENCES_SCHEMA,
+    )
+    positions = spark.createDataFrame(
+        [
+            _position_row("POS-INSIDE", -23.55, -46.64),
+            _position_row("POS-OUTSIDE", -23.57, -46.62),
+            # On the southern edge: boundary points count as inside.
+            _position_row("POS-BOUNDARY", -23.56, -46.64),
+        ],
+        POSITIONS_SCHEMA,
+    )
 
-    assert _point_is_inside_geojson_polygon(-23.55, -46.64, geometry)
-    assert not _point_is_inside_geojson_polygon(-23.57, -46.62, geometry)
-    # On the southern edge: boundary points count as inside.
-    assert _point_is_inside_geojson_polygon(-23.56, -46.64, geometry)
+    matched = {
+        row["posicao_id"]: row["geocerca_id"]
+        for row in match_positions_to_geofences(positions, geofences).collect()
+    }
+
+    assert matched == {
+        "POS-INSIDE": "GEO-A",
+        "POS-OUTSIDE": None,
+        "POS-BOUNDARY": "GEO-A",
+    }
 
 
 def test_build_analytics_matches_golden(spark):
