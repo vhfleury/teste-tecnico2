@@ -82,6 +82,36 @@ def coordinates_are_in_brazil(latitude: Column, longitude: Column) -> Column:
 GEOJSON_POLYGON_SCHEMA = "type string, coordinates array<array<array<double>>>"
 
 
+def _polygon_checks(column: Column) -> tuple[Column, Column, Column]:
+    """Build the expressions shared by the GeoJSON Polygon checks.
+
+    Single definition of what a structurally valid polygon is, shared
+    by `geojson_polygon_is_valid` and `geojson_polygon_is_in_brazil`.
+    The expressions are not null-safe: an unparseable geometry yields
+    null, and each caller decides how nulls count for its concern.
+
+    Args:
+        column: String column holding the GeoJSON geometry.
+
+    Returns:
+        A tuple with the outer ring, the structural-validity flag
+        (``Polygon`` type, non-empty coordinates, ring with at least
+        4 points) and the zeroed-point flag (the "null island"
+        defect).
+    """
+    geometry = F.from_json(column, GEOJSON_POLYGON_SCHEMA)
+    ring = geometry["coordinates"].getItem(0)
+    structurally_valid = (
+        (geometry["type"] == "Polygon")
+        & (F.size(geometry["coordinates"]) > 0)
+        & (F.size(ring) >= 4)
+    )
+    has_zeroed_point = F.exists(
+        ring, lambda point: (point.getItem(0) == 0.0) & (point.getItem(1) == 0.0)
+    )
+    return ring, structurally_valid, has_zeroed_point
+
+
 def geojson_polygon_is_valid(column: Column) -> Column:
     """Validate a GeoJSON Polygon serialized as a JSON string.
 
@@ -98,18 +128,8 @@ def geojson_polygon_is_valid(column: Column) -> Column:
         Boolean column, True when the geometry is null or
         structurally valid.
     """
-    geometry = F.from_json(column, GEOJSON_POLYGON_SCHEMA)
-    ring = geometry["coordinates"].getItem(0)
-    has_zeroed_point = F.exists(
-        ring, lambda point: (point.getItem(0) == 0.0) & (point.getItem(1) == 0.0)
-    )
-    valid = (
-        (geometry["type"] == "Polygon")
-        & (F.size(geometry["coordinates"]) > 0)
-        & (F.size(ring) >= 4)
-        & ~has_zeroed_point
-    )
-    return column.isNull() | valid
+    _, structurally_valid, has_zeroed_point = _polygon_checks(column)
+    return column.isNull() | (structurally_valid & ~has_zeroed_point)
 
 
 def geojson_polygon_is_in_brazil(column: Column) -> Column:
@@ -127,19 +147,11 @@ def geojson_polygon_is_in_brazil(column: Column) -> Column:
         Boolean column, False when a structurally valid polygon has at
         least one outer-ring point outside Brazil's broad bounding box.
     """
-    geometry = F.from_json(column, GEOJSON_POLYGON_SCHEMA)
-    ring = geometry["coordinates"].getItem(0)
-    structurally_valid = F.coalesce(
-        (geometry["type"] == "Polygon")
-        & (F.size(geometry["coordinates"]) > 0)
-        & (F.size(ring) >= 4),
-        F.lit(False),
+    ring, structurally_valid, has_zeroed_point = _polygon_checks(column)
+    valid_geometry = (
+        F.coalesce(structurally_valid, F.lit(False))
+        & ~F.coalesce(has_zeroed_point, F.lit(False))
     )
-    has_zeroed_point = F.coalesce(
-        F.exists(ring, lambda point: (point.getItem(0) == 0.0) & (point.getItem(1) == 0.0)),
-        F.lit(False),
-    )
-    valid_geometry = structurally_valid & ~has_zeroed_point
     has_outside_point = F.coalesce(
         F.exists(
             ring,
