@@ -3,15 +3,16 @@
 The golden test in ``test_staging.py`` only runs for pipelines that
 ship the fixture trio (input, table config, expected output) - a
 pipeline without them would be silently skipped, never failed. This
-test closes that gap: it discovers every ACTIVE pipeline - a package
-under pipelines/ holding the module named after it
-(``pipelines/<name>/<name>.py``), the convention the DAGs import from -
-and fails if any of the three fixture files is missing, so a new
-pipeline cannot reach CI without golden coverage.
+test closes that gap: it discovers every ACTIVE pipeline - a source
+registered in ``STAGING_SOURCES`` (run by the dynamic staging DAGs)
+or a directory shipping its own module (``pipelines/<name>/<name>.py``,
+exclusive treatment) - and fails if any of the three fixture files is
+missing, so a new pipeline cannot reach CI without golden coverage.
 """
 import os
 
 import pytest
+from staging_pipeline import STAGING_SOURCES
 
 from tests.pipelines.test_staging import PIPELINES_ROOT
 
@@ -23,20 +24,22 @@ REQUIRED_FIXTURES = (
 
 
 def discover_active_pipelines() -> list[str]:
-    """List every active pipeline package under pipelines/.
+    """List every active pipeline under pipelines/.
 
-    A pipeline is active when its directory holds the module named
-    after it (`pipelines/<name>/<name>.py`) - the convention the DAGs
-    import their PySpark logic from.
+    A pipeline is active when it is registered in ``STAGING_SOURCES``
+    (declarative source run by the dynamic staging DAGs) or when its
+    directory holds the module named after it
+    (`pipelines/<name>/<name>.py`) - exclusive-treatment pipelines.
 
     Returns:
         Sorted pipeline names.
     """
-    return sorted(
+    exclusive = {
         name
         for name in os.listdir(PIPELINES_ROOT)
         if os.path.isfile(os.path.join(PIPELINES_ROOT, name, f"{name}.py"))
-    )
+    }
+    return sorted(set(STAGING_SOURCES) | exclusive)
 
 
 def test_at_least_one_active_pipeline_exists():
