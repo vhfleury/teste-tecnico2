@@ -20,8 +20,10 @@ def get_spark(
         master: Spark master URL. Tests pass `local[1]` to avoid
             spawning one Python worker per core on Windows.
         enable_delta: When True, register the Delta Lake SQL extension
-            and catalog (gold layer). Requires the Delta jars baked
-            into the image by the Dockerfile.
+            and catalog. Every lakehouse layer is Delta, so all DAG
+            tasks pass True; unit tests exercise pure transforms and
+            keep it off. Requires the Delta jars baked into the image
+            by the Dockerfile.
 
     Returns:
         A SparkSession configured to run in local mode.
@@ -56,7 +58,7 @@ def run_spark(app_name: str, function, *args, enable_delta: bool = False):
         function: Callable invoked as `function(spark, *args)`.
         *args: Extra positional arguments forwarded to `function`.
         enable_delta: Forwarded to `get_spark`; enables Delta Lake
-            support for gold-layer transforms.
+            support for the lakehouse reads and writes.
 
     Returns:
         Whatever `function` returns.
