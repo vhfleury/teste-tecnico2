@@ -11,13 +11,13 @@ frozen expected output, keyed by `posicao_id`.
 import json
 import os
 
+from general.utils import load_table_config
+from pyspark.sql import functions as F
+
 from analytics.posicoes_geocercas import (
     _point_is_inside_geojson_polygon,
     build_analytics,
 )
-from general.utils import load_table_config
-from pyspark.sql import functions as F
-
 from tests.pipelines.diff import assert_matches_expected, dataframe_to_rows
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
