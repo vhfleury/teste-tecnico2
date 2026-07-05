@@ -91,7 +91,9 @@ def analytics_metricas_viagens():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
+        log.info("Aggregation task started - ingest_date=%s", ingest_date)
 
+        log.info("Checking processed markers of %d metric tables", len(METRIC_TABLES))
         pending = [
             name
             for name in METRIC_TABLES

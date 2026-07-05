@@ -5,6 +5,11 @@ Flow across the lakehouse layers, partitioned by ingestion date::
     data/geocercas/geocercas.geojson
       |-(extract_to_raw)->  lakehouse/raw/geocercas/ingest_date=YYYY-MM-DD
           |-(transform_to_staging)->  lakehouse/staging/geocercas/ingest_date=YYYY-MM-DD
+              |-(data_quality)-> log alert for the quarantined records
+
+Only rows with ``quality_ok`` True reach staging; rejected rows are
+written to ``lakehouse/quarantine/geocercas/`` and the ``data_quality``
+task reports their count, reasons and percentage over the total.
 
 The DAG is thin on purpose: all PySpark logic lives in
 ``pipelines/geocercas/geocercas.py`` and the staging contract
@@ -41,6 +46,7 @@ from pipelines.geocercas.geocercas import (
     RAW_DIR,
     STAGING_DIR,
     extract_to_raw,
+    report_data_quality,
     transform_to_staging,
 )
 from scripts.general.delta_io import delta_partition_processed
@@ -91,7 +97,9 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
+        log.info("Extract task started for geocercas - ingest_date=%s", ingest_date)
 
+        log.info("Checking raw partition marker at %s", RAW_DIR)
         if delta_partition_processed(RAW_DIR, ingest_date):
             log.info(
                 "Raw for %s already processed (%s) - skipping extraction",
@@ -99,6 +107,7 @@ def geocercas():
                 RAW_DIR,
             )
             raise AirflowSkipException(f"raw ingest_date={ingest_date} already exists")
+        log.info("Raw partition ingest_date=%s not processed yet - extracting", ingest_date)
 
         metrics = run_spark("geocercas_extract", extract_to_raw, ingest_date, enable_delta=True)
         log.info("Raw layer written: %s", metrics)
@@ -124,7 +133,9 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
+        log.info("Transform task started for geocercas - ingest_date=%s", ingest_date)
 
+        log.info("Checking staging partition marker at %s", STAGING_DIR)
         if delta_partition_processed(STAGING_DIR, ingest_date):
             log.info(
                 "Staging for %s already processed (%s) - skipping transform",
@@ -132,18 +143,44 @@ def geocercas():
                 STAGING_DIR,
             )
             raise AirflowSkipException(f"staging ingest_date={ingest_date} already exists")
+        log.info("Staging partition ingest_date=%s not processed yet - transforming", ingest_date)
 
         metrics = run_spark(
             "geocercas_transform", transform_to_staging, ingest_date, enable_delta=True
         )
         log.info(
-            "Staging layer written: %s records (%s flagged for quality)",
+            "Staging layer written: %s records (%s quarantined)",
             metrics["records_out"],
-            metrics["records_flagged"],
+            metrics["records_quarantined"],
         )
         return metrics
 
-    extract_to_raw_task() >> transform_to_staging_task()
+    @task(task_id="data_quality", trigger_rule="none_failed")
+    def data_quality_task(**context) -> dict:
+        """Log the alert for the partition's quarantined records.
+
+        Args:
+            **context: Airflow task context, used to resolve the
+                run's ingestion date (`YYYY-MM-DD`).
+
+        Returns:
+            Metrics returned by `report_data_quality`.
+        """
+        ingest_date = resolve_ingest_date(context)
+        log.info("Data quality task started for geocercas - ingest_date=%s", ingest_date)
+
+        metrics = run_spark(
+            "geocercas_data_quality", report_data_quality, ingest_date, enable_delta=True
+        )
+        log.info(
+            "Data quality report: %s of %s record(s) rejected (%s%%)",
+            metrics["records_rejected"],
+            metrics["records_total"],
+            metrics["rejected_pct"],
+        )
+        return metrics
+
+    extract_to_raw_task() >> transform_to_staging_task() >> data_quality_task()
 
 
 geocercas()

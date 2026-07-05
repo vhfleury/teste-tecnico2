@@ -87,7 +87,9 @@ def analytics_posicoes_geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
+        log.info("Enrichment task started - ingest_date=%s", ingest_date)
 
+        log.info("Checking analytics partition marker at %s", ANALYTICS_DIR)
         if delta_partition_processed(ANALYTICS_DIR, ingest_date):
             log.info(
                 "Analytics for %s already processed (%s) - skipping enrichment",
@@ -95,6 +97,7 @@ def analytics_posicoes_geocercas():
                 ANALYTICS_DIR,
             )
             raise AirflowSkipException(f"analytics ingest_date={ingest_date} already exists")
+        log.info("Analytics partition ingest_date=%s not processed yet - enriching", ingest_date)
 
         metrics = run_spark(
             "analytics_posicoes_geocercas_transform",
