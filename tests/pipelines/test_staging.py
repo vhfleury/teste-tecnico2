@@ -2,12 +2,13 @@
 
 For each directory under pipelines/ holding the fixture trio
 (input_<name>.json, staging_<name>.json, output_staging_<name>.json),
-loads the curated raw input, runs the pipeline's own
-``clean_and_validate`` (imported by convention from
-``pipelines/<name>/<name>.py``) and compares the result with the
-frozen expected output, keyed by the primary key declared in the
-table config. A new pipeline earns this test just by shipping its
-three files - no new test code.
+loads the curated raw input, runs the pipeline's treatment chain and
+compares the result with the frozen expected output, keyed by the
+primary key declared in the table config. Pipelines with exclusive
+treatment ship their own ``clean_and_validate`` in
+``pipelines/<name>/<name>.py``; declarative sources have no module
+and run the generic chain from ``staging_pipeline``. A new pipeline
+earns this test just by shipping its three files - no new test code.
 
 After an INTENTIONAL contract change, refresh the expected file with:
     python -m tests.pipelines.regenerate_expected <pipeline>
@@ -21,6 +22,7 @@ from data_quality.validation import enforce_table_config
 from general.utils import load_table_config
 from pyspark.sql import functions as F
 from pyspark.sql.types import ArrayType, DataType, NullType, StringType, StructField, StructType
+import staging_pipeline
 
 from tests.pipelines.diff import assert_matches_expected, dataframe_to_rows
 
@@ -135,6 +137,23 @@ def infer_raw_schema(rows: list[dict]) -> StructType:
     return _resolve_unknown(merged)
 
 
+def resolve_clean_and_validate(name: str):
+    """Locate the treatment chain a pipeline runs on fixtures.
+
+    Pipelines with exclusive treatment ship their own
+    ``clean_and_validate`` in ``pipelines/<name>/<name>.py``;
+    declarative sources have no module and run the generic chain
+    from ``staging_pipeline``.
+    """
+    try:
+        module = importlib.import_module(f"{name}.{name}")
+    except ModuleNotFoundError as error:
+        if error.name != f"{name}.{name}":
+            raise
+        return staging_pipeline.clean_and_validate
+    return module.clean_and_validate
+
+
 def produce_staging(spark, name: str) -> tuple[list[dict], list[str]]:
     """Run a pipeline's real treatment chain over its input fixture.
 
@@ -150,7 +169,7 @@ def produce_staging(spark, name: str) -> tuple[list[dict], list[str]]:
         The staging rows as JSON-friendly dicts (runtime metadata
         excluded) and the primary-key columns declared in the config.
     """
-    module = importlib.import_module(f"{name}.{name}")
+    clean_and_validate = resolve_clean_and_validate(name)
     rows = load_fixture(name, f"input_{name}.json")[f"raw_{name}"]
     config = load_table_config(os.path.join(PIPELINES_ROOT, name, f"staging_{name}.json"))
 
@@ -162,7 +181,7 @@ def produce_staging(spark, name: str) -> tuple[list[dict], list[str]]:
     if "ingested_at" in schema.names:
         raw = raw.withColumn("ingested_at", F.to_timestamp("ingested_at"))
 
-    df = enforce_table_config(module.clean_and_validate(raw, config), config)
+    df = enforce_table_config(clean_and_validate(raw, config), config)
 
     key_columns = [entry["name"] for entry in config["schema"] if entry.get("key")]
     return dataframe_to_rows(df, mask=RUNTIME_COLUMNS), key_columns
