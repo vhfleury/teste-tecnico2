@@ -1,6 +1,3 @@
-# Custom Airflow image with the Java runtime and Python packages (PySpark)
-# the pipelines need. Built from the official image; wired up in
-# docker-compose.yml via `build: .`.
 ARG AIRFLOW_VERSION=3.1.5
 ARG PYTHON_VERSION=3.11
 

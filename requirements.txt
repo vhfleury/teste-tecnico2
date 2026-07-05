@@ -1,3 +1,2 @@
 pyspark==3.5.3
-redis
 pytest
