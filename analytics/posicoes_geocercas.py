@@ -297,9 +297,11 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
         ingestion date, record count, how many positions fell inside
         a geofence and how many entry/exit events were flagged.
     """
-    log.info("Reading staging positions from %s (ingest_date=%s)", STAGING_POSICOES_DIR, ingest_date)
+    log.info("Reading staging positions from %s (ingest_date=%s)",
+             STAGING_POSICOES_DIR, ingest_date)
     positions = read_delta_partition(spark, STAGING_POSICOES_DIR, ingest_date)
-    log.info("Reading staging geofences from %s (ingest_date=%s)", STAGING_GEOCERCAS_DIR, ingest_date)
+    log.info("Reading staging geofences from %s (ingest_date=%s)",
+             STAGING_GEOCERCAS_DIR, ingest_date)
     geofences = read_delta_partition(spark, STAGING_GEOCERCAS_DIR, ingest_date)
 
     config = load_table_config(TABLE_CONFIG)
