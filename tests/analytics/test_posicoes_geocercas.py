@@ -74,7 +74,7 @@ def test_spatial_match_handles_inside_outside_and_boundary_points(spark):
             {
                 "geocerca_id": "GEO-A",
                 "nome": "Terminal A",
-                "tipo": "centro_distribuicao",
+                "tipo": "CENTRO_DISTRIBUICAO",
                 "uf": "SP",
                 "raio_km": 1.0,
                 "ativo": True,
