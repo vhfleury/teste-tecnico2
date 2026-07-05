@@ -34,10 +34,15 @@ from scripts.general.utils import (
 
 log = logging.getLogger(__name__)
 
+TASK_RETRIES = 2
+RETRY_DELAY = pendulum.duration(minutes=1)
+# Cadence at which every staging source is polled for new data.
+STAGING_SCHEDULE = "*/10 * * * *"
+
 DEFAULT_ARGS = {
     "owner": "data-eng",
-    "retries": 2,
-    "retry_delay": pendulum.duration(minutes=1),
+    "retries": TASK_RETRIES,
+    "retry_delay": RETRY_DELAY,
 }
 
 
@@ -74,7 +79,7 @@ def build_staging_dag(source: str):
     @dag(
         dag_id=source,
         description=source_config["description"],
-        schedule="*/10 * * * *",
+        schedule=STAGING_SCHEDULE,
         start_date=pendulum.datetime(2024, 1, 1, tz="UTC"),
         catchup=False,
         max_active_runs=1,

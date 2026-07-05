@@ -41,10 +41,13 @@ from scripts.general.utils import partition_path, partition_processed, resolve_i
 
 log = logging.getLogger(__name__)
 
+TASK_RETRIES = 2
+RETRY_DELAY = pendulum.duration(minutes=1)
+
 DEFAULT_ARGS = {
     "owner": "data-eng",
-    "retries": 2,
-    "retry_delay": pendulum.duration(minutes=1),
+    "retries": TASK_RETRIES,
+    "retry_delay": RETRY_DELAY,
 }
 
 # Staging inputs this DAG schedules on (published by the staging DAGs).
