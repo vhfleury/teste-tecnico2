@@ -17,7 +17,7 @@ import os
 import sys
 
 from connections.spark_session import get_spark
-from tests.pipelines.test_staging import PIPELINES_ROOT, discover_pipelines, produce_staging
+from tests.pipelines.fixtures import PIPELINES_ROOT, discover_pipelines, produce_staging
 
 
 def main() -> None:

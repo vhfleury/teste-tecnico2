@@ -14,7 +14,7 @@ import os
 import pytest
 from staging_pipeline import STAGING_SOURCES
 
-from tests.pipelines.test_staging import PIPELINES_ROOT
+from tests.pipelines.fixtures import PIPELINES_ROOT
 
 REQUIRED_FIXTURES = (
     "input_{name}.json",
