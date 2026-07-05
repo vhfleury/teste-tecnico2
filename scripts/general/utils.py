@@ -32,6 +32,18 @@ def staging_dir(pipeline: str) -> str:
     return f"{LAKEHOUSE_DIR}/staging/{pipeline}"
 
 
+def analytics_dir(dataset: str) -> str:
+    """Build the analytics layer base directory for a dataset.
+
+    Args:
+        dataset: Analytics dataset name (e.g. `posicoes_geocercas`).
+
+    Returns:
+        The analytics layer base directory inside the lakehouse.
+    """
+    return f"{LAKEHOUSE_DIR}/analytics/{dataset}"
+
+
 def raw_path(base_dir: str, ingest_date: str) -> str:
     """Build the partitioned raw path for a given ingestion date.
 
@@ -41,6 +53,19 @@ def raw_path(base_dir: str, ingest_date: str) -> str:
 
     Returns:
         The raw layer path for that partition.
+    """
+    return f"{base_dir}/ingest_date={ingest_date}"
+
+
+def analytics_path(base_dir: str, ingest_date: str) -> str:
+    """Build the partitioned analytics path for a given ingestion date.
+
+    Args:
+        base_dir: Base directory of the dataset's analytics layer.
+        ingest_date: Ingestion date in `YYYY-MM-DD` format.
+
+    Returns:
+        The analytics layer path for that partition.
     """
     return f"{base_dir}/ingest_date={ingest_date}"
 

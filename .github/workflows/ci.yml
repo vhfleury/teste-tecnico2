@@ -31,3 +31,5 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}/scripts:${{ github.workspace }}/pipelines:${{ github.workspace }}

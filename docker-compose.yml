@@ -1,24 +1,6 @@
-# Apache Airflow 3.1.5 — orquestração do pipeline ETL (LocalExecutor)
-#
-# AVISO: configuração para desenvolvimento local. Não use em produção.
-#
-# Subir:    docker compose up -d
-# UI/REST:  http://localhost:8080   (login: airflow / airflow)
-# Derrubar: docker compose down              # mantém o metadata DB (volume)
-#           docker compose down --volumes    # apaga também o metadata DB
-#
-# Variáveis suportadas (ver arquivo .env):
-#   AIRFLOW_IMAGE_NAME  - imagem usada            (default: apache/airflow:3.1.5)
-#   AIRFLOW_UID         - UID dentro dos containers (default: 50000)
-#   AIRFLOW_PROJ_DIR    - base dos volumes do Airflow (dags/logs/config/plugins)
-#                         (default: ./airflow)
-
 x-airflow-common:
   &airflow-common
   image: ${AIRFLOW_IMAGE_NAME:-bigcore-airflow-pyspark:3.1.5}
-  # Imagem custom (Dockerfile ao lado deste arquivo): apache/airflow + OpenJDK 17
-  # + PySpark (requirements.txt). Rebuilda automaticamente quando o Dockerfile
-  # ou requirements.txt mudam via `docker compose up --build`.
   build: .
   env_file:
     - ${ENV_FILE_PATH:-.env}
@@ -28,32 +10,24 @@ x-airflow-common:
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CORE__FERNET_KEY: ''
-    # DAGs nascem despausadas: ao subir o container, todas ficam ativas.
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    # Use _PIP_ADDITIONAL_REQUIREMENTS apenas para testes rápidos. Para o pipeline
-    # com Spark, prefira construir uma imagem própria (Dockerfile / build acima).
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
-    # Torna os pacotes importáveis pelas DAGs: scripts/ (parser, data_quality,
-    # general), pipelines/ (motoristas, ...) e a raiz (connections).
     PYTHONPATH: '/opt/airflow/scripts:/opt/airflow/pipelines:/opt/airflow'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-./airflow}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-./airflow}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-./airflow}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-./airflow}/plugins:/opt/airflow/plugins
-    # Pacotes de código compartilhados pelas pipelines.
     - ./connections:/opt/airflow/connections
     - ./scripts:/opt/airflow/scripts
     - ./pipelines:/opt/airflow/pipelines
-    # Dados brutos do teste, disponíveis para as DAGs (somente leitura)
+    - ./analytics:/opt/airflow/analytics
     - ./data:/opt/airflow/data:ro
-    # Testes unitários e de integração, executados dentro do container via pytest
     - ./tests:/opt/airflow/tests
-    # Saída do pipeline (raw/staging/trusted), visível no host em ./lakehouse
     - ./lakehouse:/opt/airflow/lakehouse
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
@@ -77,8 +51,6 @@ services:
       start_period: 5s
     restart: always
 
-  # API server: serve a UI web e a REST API (porta 8080). Substitui o webserver
-  # das versões 2.x do Airflow.
   airflow-apiserver:
     <<: *airflow-common
     command: api-server
@@ -111,8 +83,6 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  # Componente obrigatório no Airflow 3.x: faz o parsing das DAGs em processo
-  # separado do scheduler.
   airflow-dag-processor:
     <<: *airflow-common
     command: dag-processor
@@ -128,7 +98,6 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  # Necessário para operators "deferrable" / sensors assíncronos.
   airflow-triggerer:
     <<: *airflow-common
     command: triggerer
@@ -144,11 +113,6 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  # Inicialização: cria pastas, migra o metadata DB e cria o usuário admin.
-  # As variáveis _AIRFLOW_DB_MIGRATE e _AIRFLOW_WWW_USER_CREATE são lidas pelo
-  # entrypoint da imagem oficial. (Comandos `airflow ...` diretos NÃO funcionam
-  # aqui: o init roda como root e o pacote está no site-packages do usuário
-  # airflow - por isso o disparo das DAGs vive no serviço airflow-trigger-dags.)
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
@@ -167,11 +131,6 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
 
-  # One-shot pós-init: serializa as DAGs no metadata DB (necessário em banco
-  # recém-criado), despausa todas e DISPARA uma run de cada uma - subir o
-  # stack já executa o pipeline. Re-subir no mesmo dia é inofensivo: as
-  # tasks skipam ao encontrar o _SUCCESS da partição do dia. Roda como
-  # usuário airflow (não root), onde a CLI funciona.
   airflow-trigger-dags:
     <<: *airflow-common
     entrypoint: /bin/bash
@@ -190,7 +149,6 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  # Acesso à CLI do Airflow para depuração: `docker compose --profile debug run --rm airflow-cli`
   airflow-cli:
     <<: *airflow-common
     profiles:
