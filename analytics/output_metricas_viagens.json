@@ -2,23 +2,16 @@
     "analytics_taxa_atraso_mensal": [
         {
             "mes": "2026-04",
-            "viagens_atrasadas": 2,
-            "viagens_total": 4,
+            "viagens_atrasadas": 1,
+            "viagens_total": 2,
             "taxa_atraso": 0.5,
             "processed_at": null
         },
         {
-            "mes": "2026-05",
-            "viagens_atrasadas": 1,
-            "viagens_total": 4,
-            "taxa_atraso": 0.25,
-            "processed_at": null
-        },
-        {
             "mes": "2026-06",
-            "viagens_atrasadas": 1,
-            "viagens_total": 3,
-            "taxa_atraso": 0.3333,
+            "viagens_atrasadas": 0,
+            "viagens_total": 1,
+            "taxa_atraso": 0.0,
             "processed_at": null
         }
     ],
@@ -33,24 +26,6 @@
             "processed_at": null
         },
         {
-            "geocerca_origem_id": "GEO-0001",
-            "geocerca_destino_id": "GEO-0003",
-            "origem_nome": "CD Sao Paulo - Guarulhos",
-            "destino_nome": "Posto BR-116 Registro",
-            "tempo_medio_horas": 10.75,
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "geocerca_origem_id": "GEO-0001",
-            "geocerca_destino_id": "GEO-0004",
-            "origem_nome": "CD Sao Paulo - Guarulhos",
-            "destino_nome": "Pedagio Dutra km 207",
-            "tempo_medio_horas": 11.0,
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
             "geocerca_origem_id": "GEO-0002",
             "geocerca_destino_id": "GEO-0001",
             "origem_nome": "Cliente Rio de Janeiro - Centro",
@@ -58,94 +33,19 @@
             "tempo_medio_horas": 18.25,
             "total_viagens": 1,
             "processed_at": null
-        },
-        {
-            "geocerca_origem_id": "GEO-0002",
-            "geocerca_destino_id": "GEO-0003",
-            "origem_nome": "Cliente Rio de Janeiro - Centro",
-            "destino_nome": "Posto BR-116 Registro",
-            "tempo_medio_horas": 11.0,
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "geocerca_origem_id": "GEO-0002",
-            "geocerca_destino_id": "GEO-0004",
-            "origem_nome": "Cliente Rio de Janeiro - Centro",
-            "destino_nome": "Pedagio Dutra km 207",
-            "tempo_medio_horas": 17.0,
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "geocerca_origem_id": "GEO-0003",
-            "geocerca_destino_id": "GEO-0004",
-            "origem_nome": "Posto BR-116 Registro",
-            "destino_nome": "Pedagio Dutra km 207",
-            "tempo_medio_horas": null,
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "geocerca_origem_id": "GEO-0003",
-            "geocerca_destino_id": "GEO-9999",
-            "origem_nome": "Posto BR-116 Registro",
-            "destino_nome": null,
-            "tempo_medio_horas": 18.0,
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "geocerca_origem_id": "GEO-0004",
-            "geocerca_destino_id": "GEO-0001",
-            "origem_nome": "Pedagio Dutra km 207",
-            "destino_nome": "CD Sao Paulo - Guarulhos",
-            "tempo_medio_horas": null,
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "geocerca_origem_id": "GEO-0004",
-            "geocerca_destino_id": "GEO-0002",
-            "origem_nome": "Pedagio Dutra km 207",
-            "destino_nome": "Cliente Rio de Janeiro - Centro",
-            "tempo_medio_horas": null,
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "geocerca_origem_id": "GEO-9998",
-            "geocerca_destino_id": "GEO-0002",
-            "origem_nome": null,
-            "destino_nome": "Cliente Rio de Janeiro - Centro",
-            "tempo_medio_horas": 11.0,
-            "total_viagens": 1,
-            "processed_at": null
         }
     ],
     "analytics_tempo_parado_geocercas": [
         {
             "geocerca_tipo": "centro_distribuicao",
-            "total_visitas": 2,
-            "tempo_medio_parado_minutos": 27.0,
+            "total_visitas": 1,
+            "tempo_medio_parado_minutos": 30.0,
             "processed_at": null
         },
         {
             "geocerca_tipo": "cliente",
-            "total_visitas": 2,
-            "tempo_medio_parado_minutos": 20.0,
-            "processed_at": null
-        },
-        {
-            "geocerca_tipo": "pedagio",
-            "total_visitas": 2,
-            "tempo_medio_parado_minutos": 3.0,
-            "processed_at": null
-        },
-        {
-            "geocerca_tipo": "posto_combustivel",
             "total_visitas": 1,
-            "tempo_medio_parado_minutos": 30.0,
+            "tempo_medio_parado_minutos": 0.0,
             "processed_at": null
         }
     ],
@@ -154,27 +54,13 @@
             "posicao_rank": 1,
             "motorista_id": "MOT-0001",
             "motorista_nome": "CARLOS SILVA",
-            "viagens_concluidas": 3,
+            "viagens_concluidas": 2,
             "processed_at": null
         },
         {
             "posicao_rank": 2,
             "motorista_id": "MOT-0002",
             "motorista_nome": "ANA LIMA",
-            "viagens_concluidas": 2,
-            "processed_at": null
-        },
-        {
-            "posicao_rank": 3,
-            "motorista_id": "MOT-0003",
-            "motorista_nome": "JOAO PEREIRA",
-            "viagens_concluidas": 2,
-            "processed_at": null
-        },
-        {
-            "posicao_rank": 4,
-            "motorista_id": "MOT-9999",
-            "motorista_nome": null,
             "viagens_concluidas": 1,
             "processed_at": null
         }
@@ -182,67 +68,30 @@
     "analytics_utilizacao_frota_mensal": [
         {
             "mes": "2026-04",
-            "veiculos_com_viagem": 2,
-            "veiculos_ativos_total": 3,
-            "taxa_utilizacao": 0.6667,
-            "processed_at": null
-        },
-        {
-            "mes": "2026-05",
-            "veiculos_com_viagem": 2,
-            "veiculos_ativos_total": 3,
-            "taxa_utilizacao": 0.6667,
+            "veiculos_com_viagem": 1,
+            "veiculos_ativos_total": 2,
+            "taxa_utilizacao": 0.5,
             "processed_at": null
         },
         {
             "mes": "2026-06",
-            "veiculos_com_viagem": 2,
-            "veiculos_ativos_total": 3,
-            "taxa_utilizacao": 0.6667,
+            "veiculos_com_viagem": 1,
+            "veiculos_ativos_total": 2,
+            "taxa_utilizacao": 0.5,
             "processed_at": null
         }
     ],
     "analytics_viagens_por_mes_status": [
         {
             "mes": "2026-04",
-            "status": "atrasada",
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "mes": "2026-04",
-            "status": "cancelada",
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "mes": "2026-04",
             "status": "concluida",
             "total_viagens": 2,
-            "processed_at": null
-        },
-        {
-            "mes": "2026-05",
-            "status": "concluida",
-            "total_viagens": 2,
-            "processed_at": null
-        },
-        {
-            "mes": "2026-05",
-            "status": "em_transito",
-            "total_viagens": 1,
-            "processed_at": null
-        },
-        {
-            "mes": "2026-05",
-            "status": null,
-            "total_viagens": 1,
             "processed_at": null
         },
         {
             "mes": "2026-06",
             "status": "concluida",
-            "total_viagens": 3,
+            "total_viagens": 1,
             "processed_at": null
         }
     ]
