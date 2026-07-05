@@ -231,8 +231,8 @@ def enrich_trips(
       trip duration from ``data_inicio``.
     * ``atraso_horas`` — signed actual-vs-planned end difference
       (negative means early), null while the trip has no actual end.
-    * ``atrasada_flag`` — explicit `atrasada` status OR actual end
-      after the planned end (a late trip closed as `concluida` still
+    * ``atrasada_flag`` — explicit `ATRASADA` status OR actual end
+      after the planned end (a late trip closed as `CONCLUIDA` still
       counts as delayed).
     * ``mes`` — `yyyy-MM` month of ``data_inicio`` (UTC session), the
       bucket used by the monthly metric tables.
@@ -268,7 +268,7 @@ def enrich_trips(
         .join(aggregate_positions_by_trip(positions), "viagem_id", "left")
     )
 
-    is_delayed_status = F.coalesce(F.col("status") == F.lit("atrasada"), F.lit(False))
+    is_delayed_status = F.coalesce(F.col("status") == F.lit("ATRASADA"), F.lit(False))
     ended_late = F.coalesce(F.col("data_fim_real") > F.col("data_fim_prevista"), F.lit(False))
     enriched = (
         enriched.withColumn("duracao_horas", _hours_between("data_inicio", "data_fim_real"))

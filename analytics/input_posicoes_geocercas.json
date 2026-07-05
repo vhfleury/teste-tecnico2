@@ -44,7 +44,7 @@
         {
             "geocerca_id": "GEO-A",
             "nome": "Terminal A",
-            "tipo": "centro_distribuicao",
+            "tipo": "CENTRO_DISTRIBUICAO",
             "uf": "SP",
             "raio_km": 1.0,
             "ativo": true,
@@ -57,7 +57,7 @@
         {
             "geocerca_id": "GEO-B",
             "nome": "Cliente B",
-            "tipo": "cliente",
+            "tipo": "CLIENTE",
             "uf": "SP",
             "raio_km": 0.5,
             "ativo": true,

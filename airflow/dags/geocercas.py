@@ -5,11 +5,12 @@ Flow across the lakehouse layers, partitioned by ingestion date::
     data/geocercas/geocercas.geojson
       |-(extract_to_raw)->  lakehouse/raw/geocercas/ingest_date=YYYY-MM-DD
           |-(transform_to_staging)->  lakehouse/staging/geocercas/ingest_date=YYYY-MM-DD
-              |-(data_quality)-> log alert for the quarantined records
+              |-(data_quality)-> log alert for the rejected records
 
 Only rows with ``quality_ok`` True reach staging; rejected rows are
-written to ``lakehouse/quarantine/geocercas/`` and the ``data_quality``
-task reports their count, reasons and percentage over the total.
+discarded — never persisted. The ``data_quality`` task logs the alert
+(count, reasons, percentage over the total) from the transform metrics
+passed via XCom; when the transform is skipped, it skips along.
 
 The DAG is thin on purpose: all PySpark logic lives in
 ``pipelines/geocercas/geocercas.py`` and the staging contract
@@ -29,6 +30,8 @@ the extraction task was skipped because raw already existed.
 
 Tasks communicate through the persisted layer (the raw Delta table), not
 XCom: each one reads/writes the lakehouse and can be re-run independently.
+The one exception is the ``data_quality`` alert: rejected rows are never
+persisted, so the transform's metrics travel to that task via XCom.
 
 The final task publishes the ``staging_geocercas`` Asset, the data-aware
 trigger for the future gold DAG (geospatial enrichment + trip fact table).
@@ -46,9 +49,9 @@ from pipelines.geocercas.geocercas import (
     RAW_DIR,
     STAGING_DIR,
     extract_to_raw,
-    report_data_quality,
     transform_to_staging,
 )
+from scripts.data_quality.quality_report import log_rejection_alert
 from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import resolve_ingest_date
 
@@ -149,38 +152,29 @@ def geocercas():
             "geocercas_transform", transform_to_staging, ingest_date, enable_delta=True
         )
         log.info(
-            "Staging layer written: %s records (%s quarantined)",
+            "Staging layer written: %s records (%s rejected and discarded)",
             metrics["records_out"],
-            metrics["records_quarantined"],
+            metrics["records_rejected"],
         )
         return metrics
 
-    @task(task_id="data_quality", trigger_rule="none_failed")
-    def data_quality_task(**context) -> dict:
-        """Log the alert for the partition's quarantined records.
+    @task(task_id="data_quality")
+    def data_quality_task(metrics: dict) -> None:
+        """Log the data-quality alert for the partition's rejected rows.
 
         Args:
-            **context: Airflow task context, used to resolve the
-                run's ingestion date (`YYYY-MM-DD`).
-
-        Returns:
-            Metrics returned by `report_data_quality`.
+            metrics: Transform metrics received via XCom, with the
+                rejected count, percentage and count per reason.
         """
-        ingest_date = resolve_ingest_date(context)
-        log.info("Data quality task started for geocercas - ingest_date=%s", ingest_date)
-
-        metrics = run_spark(
-            "geocercas_data_quality", report_data_quality, ingest_date, enable_delta=True
-        )
         log.info(
-            "Data quality report: %s of %s record(s) rejected (%s%%)",
-            metrics["records_rejected"],
-            metrics["records_total"],
-            metrics["rejected_pct"],
+            "Data quality task started for geocercas - ingest_date=%s",
+            metrics["ingest_date"],
         )
-        return metrics
+        log_rejection_alert(metrics)
 
-    extract_to_raw_task() >> transform_to_staging_task() >> data_quality_task()
+    staging_metrics = transform_to_staging_task()
+    extract_to_raw_task() >> staging_metrics
+    data_quality_task(staging_metrics)
 
 
 geocercas()

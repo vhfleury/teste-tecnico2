@@ -102,7 +102,7 @@ def build_avg_route_duration(trips: DataFrame) -> DataFrame:
 def build_monthly_delay_rate(trips: DataFrame) -> DataFrame:
     """Compute the monthly delay rate (delayed trips / total trips).
 
-    Delayed means ``atrasada_flag`` (explicit `atrasada` status OR
+    Delayed means ``atrasada_flag`` (explicit `ATRASADA` status OR
     actual end after the planned end). Trips without a month are
     excluded.
 
@@ -139,7 +139,7 @@ def build_top_drivers(trips: DataFrame) -> DataFrame:
         At most ``TOP_DRIVERS_LIMIT`` rows, ranked by completed trips.
     """
     completed = trips.filter(
-        (F.col("status") == F.lit("concluida")) & F.col("motorista_id").isNotNull()
+        (F.col("status") == F.lit("CONCLUIDA")) & F.col("motorista_id").isNotNull()
     )
     ranked = (
         completed.groupBy("motorista_id")
@@ -175,7 +175,7 @@ def build_monthly_fleet_utilization(trips: DataFrame, vehicles: DataFrame) -> Da
     Returns:
         One row per month with the counts and the utilization rate.
     """
-    active_vehicles = vehicles.filter(F.col("status") == F.lit("ativo")).select("veiculo_id")
+    active_vehicles = vehicles.filter(F.col("status") == F.lit("ATIVO")).select("veiculo_id")
     monthly_trips = trips.filter(F.col("mes").isNotNull())
 
     months = monthly_trips.select("mes").distinct()

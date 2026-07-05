@@ -9,7 +9,7 @@
             "data_inicio": "2026-04-01 08:00:00",
             "data_fim_prevista": "2026-04-01 20:00:00",
             "data_fim_real": "2026-04-01 18:30:00",
-            "status": "concluida",
+            "status": "CONCLUIDA",
             "distancia_km": 430,
             "peso_carga_kg": 12000,
             "nota_fiscal": "NF-100001",
@@ -27,7 +27,7 @@
             "data_inicio": "2026-04-02 06:00:00",
             "data_fim_prevista": "2026-04-02 18:00:00",
             "data_fim_real": "2026-04-03 00:15:00",
-            "status": "concluida",
+            "status": "CONCLUIDA",
             "distancia_km": 520,
             "peso_carga_kg": 18000,
             "nota_fiscal": "NF-100002",
@@ -45,7 +45,7 @@
             "data_inicio": "2026-05-08 08:00:00",
             "data_fim_prevista": "2026-05-08 20:00:00",
             "data_fim_real": "2026-05-08 19:00:00",
-            "status": "concluida",
+            "status": "CONCLUIDA",
             "distancia_km": 410,
             "peso_carga_kg": 9500,
             "nota_fiscal": "NF-100006",
@@ -63,7 +63,7 @@
             "modelo": "VM 270",
             "tipo": "Carreta LS",
             "capacidade_kg": 41500,
-            "status": "ativo"
+            "status": "ATIVO"
         },
         {
             "veiculo_id": "VEI-0002",
@@ -72,7 +72,7 @@
             "modelo": "R450",
             "tipo": "Bitrem",
             "capacidade_kg": 57000,
-            "status": "em_manutencao"
+            "status": "EM_MANUTENCAO"
         },
         {
             "veiculo_id": "VEI-0003",
@@ -81,7 +81,7 @@
             "modelo": "ACTROS 2651",
             "tipo": "VUC",
             "capacidade_kg": 3500,
-            "status": "ativo"
+            "status": "ATIVO"
         }
     ],
     "staging_motoristas": [
@@ -111,19 +111,19 @@
         {
             "geocerca_id": "GEO-0001",
             "nome": "CD Sao Paulo - Guarulhos",
-            "tipo": "centro_distribuicao",
+            "tipo": "CENTRO_DISTRIBUICAO",
             "uf": "SP"
         },
         {
             "geocerca_id": "GEO-0002",
             "nome": "Cliente Rio de Janeiro - Centro",
-            "tipo": "cliente",
+            "tipo": "CLIENTE",
             "uf": "RJ"
         },
         {
             "geocerca_id": "GEO-0003",
             "nome": "Posto BR-116 Registro",
-            "tipo": "posto_combustivel",
+            "tipo": "POSTO_COMBUSTIVEL",
             "uf": "SP"
         }
     ],

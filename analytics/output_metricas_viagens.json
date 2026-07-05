@@ -37,13 +37,13 @@
     ],
     "analytics_tempo_parado_geocercas": [
         {
-            "geocerca_tipo": "centro_distribuicao",
+            "geocerca_tipo": "CENTRO_DISTRIBUICAO",
             "total_visitas": 1,
             "tempo_medio_parado_minutos": 30.0,
             "processed_at": null
         },
         {
-            "geocerca_tipo": "cliente",
+            "geocerca_tipo": "CLIENTE",
             "total_visitas": 1,
             "tempo_medio_parado_minutos": 0.0,
             "processed_at": null
@@ -84,13 +84,13 @@
     "analytics_viagens_por_mes_status": [
         {
             "mes": "2026-04",
-            "status": "concluida",
+            "status": "CONCLUIDA",
             "total_viagens": 2,
             "processed_at": null
         },
         {
             "mes": "2026-06",
-            "status": "concluida",
+            "status": "CONCLUIDA",
             "total_viagens": 1,
             "processed_at": null
         }
