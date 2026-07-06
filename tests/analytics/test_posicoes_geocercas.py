@@ -14,14 +14,14 @@ import os
 from general.utils import load_table_config
 from pyspark.sql import functions as F
 
-from analytics.posicoes_geocercas import (
+from analytics.posicoes_geocercas.posicoes_geocercas import (
     build_analytics,
     match_positions_to_geofences,
 )
 from tests.pipelines.diff import assert_matches_expected, dataframe_to_rows
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ANALYTICS_ROOT = os.path.join(ROOT, "analytics")
+ANALYTICS_ROOT = os.path.join(ROOT, "analytics", "posicoes_geocercas")
 
 # Runtime metadata: the column must exist in the output (config is the
 # contract), but its value is generated at execution time, so it is

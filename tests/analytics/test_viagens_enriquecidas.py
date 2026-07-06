@@ -17,11 +17,11 @@ from general.utils import load_table_config
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-from analytics.viagens_enriquecidas import build_analytics
+from analytics.viagens_enriquecidas.viagens_enriquecidas import build_analytics
 from tests.pipelines.diff import assert_matches_expected, dataframe_to_rows
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ANALYTICS_ROOT = os.path.join(ROOT, "analytics")
+ANALYTICS_ROOT = os.path.join(ROOT, "analytics", "viagens_enriquecidas")
 
 # Runtime metadata: the column must exist in the output (config is the
 # contract), but its value is generated at execution time, so it is
