@@ -78,6 +78,7 @@
         {
             "name": "data_ultima_revisao",
             "type": "date",
+            "treatments": ["parse_date"],
             "validations": [
                 {"check": "required", "reason": "missing_revision_date"}
             ],

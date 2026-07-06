@@ -40,6 +40,7 @@
         {
             "name": "data_inicio",
             "type": "timestamp",
+            "treatments": ["parse_date"],
             "validations": [
                 {"check": "required", "reason": "missing_start_date"}
             ],
@@ -48,11 +49,13 @@
         {
             "name": "data_fim_prevista",
             "type": "timestamp",
+            "treatments": ["parse_date"],
             "example": "2026-04-29 15:34:51.499012"
         },
         {
             "name": "data_fim_real",
             "type": "timestamp",
+            "treatments": ["parse_date"],
             "example": "2026-05-01 00:36:13.170904"
         },
         {

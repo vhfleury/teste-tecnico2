@@ -55,6 +55,7 @@
         {
             "name": "timestamp",
             "type": "timestamp",
+            "treatments": ["parse_date"],
             "validations": [
                 {"check": "required", "reason": "missing_timestamp"}
             ],

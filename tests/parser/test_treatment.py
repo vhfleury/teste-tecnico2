@@ -55,6 +55,31 @@ def test_apply_table_treatments_casts_to_declared_type(spark):
     ]
 
 
+def test_apply_table_treatments_parse_date_handles_dates_and_timestamps(spark):
+    # parse_date trims and parses; the declared type finalizes the
+    # precision (date drops the time, timestamp keeps the microseconds).
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {"name": "d", "type": "date", "treatments": ["parse_date"]},
+            {"name": "ts", "type": "timestamp", "treatments": ["parse_date"]},
+        ],
+    }
+    df = spark.createDataFrame(
+        [("  2025-10-23 ", "2026-04-28 21:34:58.588212"), ("not a date", None)],
+        "d string, ts string",
+    )
+
+    result = apply_table_treatments(df, config)
+
+    assert dict(result.dtypes)["d"] == "date"
+    assert dict(result.dtypes)["ts"] == "timestamp"
+    assert [(row["d"], row["ts"]) for row in result.collect()] == [
+        (datetime.date(2025, 10, 23), datetime.datetime(2026, 4, 28, 21, 34, 58, 588212)),
+        (None, None),  # unparseable/null becomes null, flagged later by validations
+    ]
+
+
 def test_apply_table_treatments_drops_keyless_rows_but_keeps_duplicates(spark):
     # Null/empty keys are dropped here; duplicate keys are left in place
     # for the `unique` validation to flag (so they reach the alert).

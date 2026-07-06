@@ -59,6 +59,7 @@
         {
             "name": "validade_cnh",
             "type": "date",
+            "treatments": ["parse_date"],
             "validations": [
                 {"check": "required", "reason": "missing_cnh_expiry"}
             ],
@@ -73,6 +74,7 @@
         {
             "name": "data_admissao",
             "type": "date",
+            "treatments": ["parse_date"],
             "validations": [
                 {"check": "required", "reason": "missing_admission_date"}
             ],

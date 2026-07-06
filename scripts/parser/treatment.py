@@ -33,12 +33,31 @@ def normalize(column: Column) -> Column:
     return F.upper(F.trim(column))
 
 
+def parse_date(column: Column) -> Column:
+    """Parse a date/datetime string into a timestamp.
+
+    Trims surrounding whitespace and parses the value with Spark's
+    lenient ISO parser; the column's declared ``type`` (``date`` or
+    ``timestamp``) then finalizes the precision in
+    `apply_table_treatments`. A malformed value becomes null and is
+    flagged by the validations, instead of aborting the job.
+
+    Args:
+        column: String column holding the date or datetime.
+
+    Returns:
+        Timestamp column, null when the value cannot be parsed.
+    """
+    return F.to_timestamp(F.trim(column))
+
+
 # Treatments a table config can declare on a column (`treatments`),
 # applied in the declared order. Treatments change values; anything
 # that flags rows instead belongs to data_quality.
 TREATMENTS = {
     "trim": F.trim,
     "normalize": normalize,
+    "parse_date": parse_date,
     "normalize_cpf": normalize_cpf,
     "normalize_telefone": normalize_telefone,
 }
