@@ -1,4 +1,4 @@
-"""DAG ``analytics_viagens_enriquecidas`` - consolidates trips enriched with vehicle, driver, geofence and trip metrics, scheduled on the five staging Assets."""
+"""DAG ``analytics_viagens_enriquecidas`` - consolidates trips with dimensions and metrics."""
 from __future__ import annotations
 
 import logging

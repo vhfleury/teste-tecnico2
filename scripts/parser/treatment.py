@@ -83,7 +83,7 @@ def trim_columns(df: DataFrame, columns: list[str]) -> DataFrame:
 
 
 def drop_null_keys(df: DataFrame, key_columns: list[str]) -> DataFrame:
-    """Drop rows whose primary key is null or empty (duplicate keys are flagged by the ``unique`` validation, not dropped here).
+    """Drop rows whose primary key is null or empty; duplicates flagged by ``unique``.
 
     Args:
         df: DataFrame to transform.
@@ -134,7 +134,7 @@ def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
 
 
 def apply_derived_columns(df: DataFrame, config: dict) -> DataFrame:
-    """Create the ``new_name`` derived columns; runs after the validations so a nulled-out source derives null.
+    """Create the ``new_name`` derived columns after the validations (nulled source -> null).
 
     Args:
         df: DataFrame already treated and validated.

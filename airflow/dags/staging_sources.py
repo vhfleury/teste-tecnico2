@@ -1,4 +1,4 @@
-"""Generates one staging ingestion DAG per active declarative source (raw -> staging + data-quality alert)."""
+"""Generates one staging ingestion DAG per active declarative source (raw -> staging)."""
 from __future__ import annotations
 
 import logging

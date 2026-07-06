@@ -1,4 +1,4 @@
-"""DAG ``analytics_posicoes_geocercas`` - enriches tracking positions with geofence events, scheduled on the posicoes and geocercas staging Assets."""
+"""DAG ``analytics_posicoes_geocercas`` - enriches tracking positions with geofence events."""
 from __future__ import annotations
 
 import logging

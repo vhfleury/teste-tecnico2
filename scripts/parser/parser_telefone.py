@@ -7,7 +7,7 @@ from pyspark.sql import functions as F
 
 
 def normalize_telefone(telefone: Column) -> Column:
-    """Reduce a phone number to DDD + subscriber digits, stripping punctuation, `+55` and the trunk zero.
+    """Reduce a phone number to DDD + subscriber digits (strips punctuation, `+55`, trunk zero).
 
     Args:
         telefone: Column with the phone number in any common format.

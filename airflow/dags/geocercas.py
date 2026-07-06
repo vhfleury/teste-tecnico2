@@ -1,4 +1,4 @@
-"""DAG ``geocercas`` - ingests the geofence registry from GeoJSON to raw to staging, with a data-quality alert."""
+"""DAG ``geocercas`` - ingests the geofence registry from GeoJSON to raw and staging."""
 from __future__ import annotations
 
 import logging

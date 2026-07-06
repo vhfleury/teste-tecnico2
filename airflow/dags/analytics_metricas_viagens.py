@@ -1,4 +1,4 @@
-"""DAG ``analytics_metricas_viagens`` - builds the six aggregated trip-metric Delta tables, scheduled on the enriched-trips and positions-geofences Assets."""
+"""DAG ``analytics_metricas_viagens`` - builds the six aggregated trip-metric Delta tables."""
 from __future__ import annotations
 
 import logging
