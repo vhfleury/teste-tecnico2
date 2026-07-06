@@ -126,6 +126,15 @@ São **8 DAGs finas** — a lógica PySpark vive em `pipelines/` (staging) e `an
 
 ---
 
+## Notebooks de análise
+
+Na raiz do projeto, dois notebooks registram a análise que embasou o pipeline (ficam fora do fluxo do Airflow):
+
+- **[analise_dados_raw.ipynb](analise_dados_raw.ipynb)** — análise exploratória dos dados crus (formato, tipos, qualidade e defeitos das fontes), feita para entender os dados antes de modelar o staging.
+- **[metricas.ipynb](metricas.ipynb)** — consolidação das métricas: prototipagem dos agregados que depois foram materializados nas tabelas de `analytics/metricas_viagens/`.
+
+---
+
 ## Decisões técnicas
 
 **Staging dirigida por config.** Cada tabela declara colunas, tipos, tratamentos e validações em um JSON (`pipelines/<fonte>/staging_<fonte>.json`). Um motor genérico (`pipelines/staging_pipeline.py`) executa a cadeia `treatments → validations → colunas derivadas` para qualquer fonte — adicionar uma fonte declarativa nova não exige código Python, só o registro em `STAGING_SOURCES` e os três fixtures (`input_`, `staging_`, `output_staging_`). O config é um **contrato**: `enforce_table_config` roda antes de todo write e aborta se o DataFrame divergir do declarado. A única fonte com módulo próprio é `geocercas`, que achata o GeoJSON antes da cadeia comum — mas ela **não reimplementa o fluxo**, delega ao mesmo motor genérico passando seu `clean_and_validate`.
@@ -254,6 +263,8 @@ scripts/parser/        # tratamentos que alteram valores
 scripts/data_quality/  # validações que só flaggam + enforce do contrato
 scripts/general/       # paths, configs, helpers de I/O Delta
 tests/                 # espelha o código: unitários, golden, guard de cobertura e smoke de DAG
+analise_dados_raw.ipynb  # notebook: análise exploratória das fontes cruas
+metricas.ipynb           # notebook: consolidação das métricas
 Dockerfile             # Airflow 3.1.5 + OpenJDK 17 + jars Delta/Sedona
 docker-compose.yml     # postgres + serviços do Airflow + init + trigger-dags + dashboard
 desafio.md             # enunciado original
