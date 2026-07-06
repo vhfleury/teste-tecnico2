@@ -25,7 +25,7 @@ jobs:
   dag-parse:
     runs-on: ubuntu-latest
     env:
-      AIRFLOW_HOME: ${{ runner.temp }}/airflow_home
+      AIRFLOW_HOME: ${{ github.workspace }}/airflow_home
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
     steps:
