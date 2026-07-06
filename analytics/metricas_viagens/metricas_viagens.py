@@ -252,6 +252,27 @@ def table_config_path(name: str) -> str:
     return os.path.join(CONFIG_ROOT, f"analytics_{name}.json")
 
 
+# A trip counts for the metrics only when its vehicle and driver both resolved
+# in the join. Geofence orphans do not make a trip invalid.
+TRIP_INVALIDATING_REASONS = ("vehicle_not_found", "driver_not_found")
+
+
+def valid_trips(trips: DataFrame) -> DataFrame:
+    """Keep only trips whose vehicle and driver resolved (no orphan on either).
+
+    Args:
+        trips: Enriched trips DataFrame carrying ``dq_observations``.
+
+    Returns:
+        The trips without a vehicle/driver referential orphan. The enriched
+        fact table keeps every trip; only the metrics narrow to the valid ones.
+    """
+    invalid = F.lit(False)
+    for reason in TRIP_INVALIDATING_REASONS:
+        invalid = invalid | F.col("dq_observations").contains(reason)
+    return trips.filter(~F.coalesce(invalid, F.lit(False)))
+
+
 def build_metric(name: str, frames: dict[str, DataFrame]) -> DataFrame:
     """Build one metric table and enforce its declared contract.
 
@@ -264,6 +285,10 @@ def build_metric(name: str, frames: dict[str, DataFrame]) -> DataFrame:
         The final metric DataFrame, matching the declared schema.
     """
     spec = METRIC_TABLES[name]
+    if "trips" in spec["inputs"]:
+        # Metrics aggregate over valid trips only; orphan trips stay in
+        # viagens_enriquecidas but must not skew the aggregates.
+        frames = {**frames, "trips": valid_trips(frames["trips"])}
     inputs = [frames[input_name] for input_name in spec["inputs"]]
     df = spec["builder"](*inputs).withColumn("processed_at", F.current_timestamp())
     return enforce_table_config(df, load_table_config(table_config_path(name)))

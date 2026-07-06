@@ -81,7 +81,7 @@ def analytics_viagens_enriquecidas():
             enable_delta=True,
         )
         log.info(
-            "Analytics layer written: %s records, %s flagged, %s delayed",
+            "Analytics layer written: %s trips, %s flagged as orphan, %s delayed",
             metrics["records"],
             metrics["records_flagged"],
             metrics["records_delayed"],
