@@ -5,7 +5,7 @@ import pytest
 from parser.treatment import (
     apply_derived_columns,
     apply_table_treatments,
-    deduplicate_by_key,
+    drop_null_keys,
     trim_columns,
 )
 
@@ -55,7 +55,9 @@ def test_apply_table_treatments_casts_to_declared_type(spark):
     ]
 
 
-def test_apply_table_treatments_deduplicates_by_declared_key(spark):
+def test_apply_table_treatments_drops_keyless_rows_but_keeps_duplicates(spark):
+    # Null/empty keys are dropped here; duplicate keys are left in place
+    # for the `unique` validation to flag (so they reach the alert).
     config = {
         "table_name": "staging_example",
         "schema": [{"name": "id", "type": "string", "key": True}],
@@ -67,7 +69,7 @@ def test_apply_table_treatments_deduplicates_by_declared_key(spark):
 
     result = apply_table_treatments(df, config).collect()
 
-    assert sorted(row["id"] for row in result) == ["ID-1", "ID-2"]
+    assert sorted(row["id"] for row in result) == ["ID-1", "ID-1", "ID-2"]
 
 
 def test_apply_table_treatments_skips_absent_columns(spark):
@@ -166,7 +168,7 @@ def test_trim_columns_strips_only_the_given_columns(spark):
     ]
 
 
-def test_deduplicate_by_key_drops_null_empty_and_duplicate_keys(spark):
+def test_drop_null_keys_drops_null_and_empty_keeps_duplicates(spark):
     df = spark.createDataFrame(
         [
             ("ID-1", "kept"),
@@ -178,26 +180,30 @@ def test_deduplicate_by_key_drops_null_empty_and_duplicate_keys(spark):
         ["id", "label"],
     )
 
-    result = deduplicate_by_key(df, ["id"]).collect()
+    result = drop_null_keys(df, ["id"]).collect()
 
-    assert sorted(row["id"] for row in result) == ["ID-1", "ID-2"]
+    # Null/empty keys go; duplicates stay (flagged later by `unique`).
+    assert sorted(row["id"] for row in result) == ["ID-1", "ID-1", "ID-2"]
 
 
-def test_deduplicate_by_key_requires_every_column_of_a_composite_key(spark):
+def test_drop_null_keys_requires_every_column_of_a_composite_key(spark):
     df = spark.createDataFrame(
         [
             ("ID-1", "2024-01-01", "kept"),
             ("ID-1", "2024-01-02", "kept, other second key"),
-            ("ID-1", "2024-01-01", "duplicate composite key"),
+            ("ID-1", "2024-01-01", "duplicate composite key kept"),
             ("ID-1", None, "null second key"),
             ("ID-1", "", "empty second key"),
         ],
         ["id", "event_date", "label"],
     )
 
-    result = deduplicate_by_key(df, ["id", "event_date"]).collect()
+    result = drop_null_keys(df, ["id", "event_date"]).collect()
 
+    # A null/empty part of the composite key drops the row; the repeated
+    # (ID-1, 2024-01-01) pair is kept for the `unique` validation.
     assert sorted((row["id"], row["event_date"]) for row in result) == [
+        ("ID-1", "2024-01-01"),
         ("ID-1", "2024-01-01"),
         ("ID-1", "2024-01-02"),
     ]

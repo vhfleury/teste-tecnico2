@@ -583,6 +583,77 @@ def test_apply_table_validations_geojson_polygon_brazil_bounds_check(spark):
     ]
 
 
+def test_apply_table_validations_unique_flags_duplicate_keys(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "motorista_id",
+                "type": "string",
+                "key": True,
+                "validations": [{"check": "unique", "reason": "duplicate_key"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [("MOT-0001",), ("MOT-0002",), ("MOT-0002",)],
+        "motorista_id string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # The first row of each key passes; the extra MOT-0002 is flagged and
+    # its key nulled, so it is rejected and counted in the alert instead
+    # of being dropped silently.
+    flags = {
+        (row["motorista_id"], row["dq_observations"], row["quality_ok"]) for row in result
+    }
+    assert flags == {
+        ("MOT-0001", "", True),
+        ("MOT-0002", "", True),
+        (None, "duplicate_key", False),
+    }
+
+
+def test_apply_table_validations_unique_on_non_key_column_ignores_nulls(spark):
+    # Uniqueness also guards a non-key column (a duplicate invoice): nulls
+    # are distinct (never flagged), and the kept row is the first by
+    # primary key so the flagged duplicate is deterministic.
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {"name": "viagem_id", "type": "string", "key": True},
+            {
+                "name": "nota_fiscal",
+                "type": "string",
+                "validations": [{"check": "unique", "reason": "duplicate_invoice"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("VIA-1", "NF-1"),
+            ("VIA-2", "NF-1"),
+            ("VIA-3", None),
+            ("VIA-4", None),
+        ],
+        "viagem_id string, nota_fiscal string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    flags = {
+        (row["viagem_id"], row["nota_fiscal"], row["dq_observations"], row["quality_ok"])
+        for row in result
+    }
+    assert flags == {
+        ("VIA-1", "NF-1", "", True),
+        ("VIA-2", None, "duplicate_invoice", False),
+        ("VIA-3", None, "", True),
+        ("VIA-4", None, "", True),
+    }
+
+
 def test_apply_table_validations_fails_on_unknown_check(spark):
     config = {
         "table_name": "staging_example",
