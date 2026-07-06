@@ -17,7 +17,8 @@ from staging) with ``quality_ok`` set to false.
 
 Position aggregates are computed at the trip grain BEFORE the join, so
 the fact never fans out. Staging already guarantees unique, non-null
-primary keys on every dimension (`deduplicate_by_key`), so dimension
+primary keys on every dimension (keyless rows dropped in treatment,
+duplicate keys rejected by the ``unique`` validation), so dimension
 joins cannot fan out either.
 """
 from __future__ import annotations
