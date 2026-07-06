@@ -169,5 +169,17 @@ services:
     depends_on:
       <<: *airflow-common-depends-on
 
+  # Streamlit visibility layer over the analytics (gold) Delta tables. Reads the
+  # lakehouse read-only with delta-rs (no Spark/JVM). Starts with the stack.
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      LAKEHOUSE_DIR: /lakehouse
+    volumes:
+      - ./lakehouse:/lakehouse:ro
+    restart: unless-stopped
+
 volumes:
   postgres-db-volume:
