@@ -1,36 +1,4 @@
-"""DAG ``analytics_viagens_enriquecidas`` - consolidated trips enrichment.
-
-Flow across the lakehouse layers, partitioned by ingestion date::
-
-    lakehouse/staging/viagens/ingest_date=YYYY-MM-DD
-    lakehouse/staging/veiculos/ingest_date=YYYY-MM-DD
-    lakehouse/staging/motoristas/ingest_date=YYYY-MM-DD
-    lakehouse/staging/geocercas/ingest_date=YYYY-MM-DD
-    lakehouse/staging/posicoes/ingest_date=YYYY-MM-DD
-      |-(enrich_to_analytics)-> lakehouse/analytics/viagens_enriquecidas (Delta)
-
-The DAG is thin on purpose: all PySpark enrichment logic lives in
-``analytics/viagens_enriquecidas.py`` and the analytics table contract
-in ``analytics_viagens_enriquecidas.json``.
-
-Data-aware scheduling: instead of a cron, the DAG runs when the five
-staging Assets are published by the staging DAGs, so analytics never
-reads a partition that has not been written yet.
-
-The gold table is Delta: each run atomically replaces only its own
-``ingest_date`` partition (``replaceWhere``), so reprocessing a date
-can never duplicate or corrupt other partitions.
-
-**Idempotency via pre-check:** Delta writes no ``_SUCCESS`` marker, so
-before doing any work the task checks the gold partition marker
-written after the Delta commit (``_markers/<ingest_date>``). If it
-exists, the task is skipped (``AirflowSkipException``) instead of
-reprocessing.
-
-The task publishes the ``analytics_viagens_enriquecidas`` Asset, the
-data-aware trigger for downstream consumers of the enriched trips
-(e.g. the aggregated metrics DAG).
-"""
+"""DAG ``analytics_viagens_enriquecidas`` - consolidates trips with dimensions and metrics."""
 from __future__ import annotations
 
 import logging
@@ -39,7 +7,10 @@ import pendulum
 from airflow.exceptions import AirflowSkipException
 from airflow.sdk import Asset, dag, task
 
-from analytics.viagens_enriquecidas import ANALYTICS_DIR, transform_to_analytics
+from analytics.viagens_enriquecidas.viagens_enriquecidas import (
+    ANALYTICS_DIR,
+    transform_to_analytics,
+)
 from connections.spark_session import run_spark
 from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import resolve_ingest_date
@@ -99,7 +70,9 @@ def analytics_viagens_enriquecidas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
+        log.info("Enrichment task started - ingest_date=%s", ingest_date)
 
+        log.info("Checking analytics partition marker at %s", ANALYTICS_DIR)
         if delta_partition_processed(ANALYTICS_DIR, ingest_date):
             log.info(
                 "Analytics for %s already processed (%s) - skipping enrichment",
@@ -107,6 +80,7 @@ def analytics_viagens_enriquecidas():
                 ANALYTICS_DIR,
             )
             raise AirflowSkipException(f"analytics ingest_date={ingest_date} already exists")
+        log.info("Analytics partition ingest_date=%s not processed yet - enriching", ingest_date)
 
         metrics = run_spark(
             "analytics_viagens_enriquecidas_transform",

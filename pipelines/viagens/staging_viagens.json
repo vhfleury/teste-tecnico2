@@ -7,36 +7,40 @@
             "name": "viagem_id",
             "type": "string",
             "key": true,
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
+            "validations": [
+                {"check": "unique", "reason": "duplicate_key"}
+            ],
             "example": "VIA-000001"
         },
         {
             "name": "veiculo_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "VEI-0062"
         },
         {
             "name": "motorista_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "MOT-0054"
         },
         {
             "name": "geocerca_origem_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "GEO-0005"
         },
         {
             "name": "geocerca_destino_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "GEO-0027"
         },
         {
             "name": "data_inicio",
             "type": "timestamp",
+            "treatments": ["parse_date"],
             "validations": [
                 {"check": "required", "reason": "missing_start_date"}
             ],
@@ -45,21 +49,23 @@
         {
             "name": "data_fim_prevista",
             "type": "timestamp",
+            "treatments": ["parse_date"],
             "example": "2026-04-29 15:34:51.499012"
         },
         {
             "name": "data_fim_real",
             "type": "timestamp",
+            "treatments": ["parse_date"],
             "example": "2026-05-01 00:36:13.170904"
         },
         {
             "name": "status",
             "type": "string",
-            "treatments": ["trim", "lowercase"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "trip_status_is_valid", "reason": "invalid_status"}
             ],
-            "example": ["concluida", "em_transito", "cancelada", "atrasada"]
+            "example": ["CONCLUIDA", "EM_TRANSITO", "CANCELADA", "ATRASADA"]
         },
         {
             "name": "distancia_km",
@@ -73,16 +79,17 @@
             "name": "peso_carga_kg",
             "type": "int",
             "validations": [
-                {"check": "positive", "reason": "invalid_cargo_weight"}
+                {"check": "non_negative", "reason": "negative_cargo_weight"}
             ],
             "example": 29358
         },
         {
             "name": "nota_fiscal",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "validations": [
-                {"check": "required", "reason": "missing_invoice"}
+                {"check": "required", "reason": "missing_invoice"},
+                {"check": "unique", "reason": "duplicate_invoice"}
             ],
             "example": "NF-577810"
         },

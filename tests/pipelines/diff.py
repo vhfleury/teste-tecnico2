@@ -1,10 +1,4 @@
-"""Golden-file comparison for pipeline tests.
-
-Compares result rows against the frozen expected output by primary
-key (never by position) and reports every divergence in three
-categories: rows missing from the result, unexpected extra rows and
-cell-level differences (including columns present on one side only).
-"""
+"""Golden-file comparison for pipeline tests."""
 from __future__ import annotations
 
 from pyspark.sql import DataFrame
@@ -15,19 +9,12 @@ MISSING = "<missing>"
 def dataframe_to_rows(df: DataFrame, mask: tuple = ()) -> list[dict]:
     """Collect a DataFrame as JSON-friendly dicts.
 
-    Dates and timestamps become strings so rows compare cleanly
-    against a JSON fixture. Columns in ``mask`` are kept in place
-    (the table must contain them, in order) but their value becomes
-    null - they are runtime metadata whose value is non-deterministic
-    (e.g. `processed_at`).
-
     Args:
         df: DataFrame to collect.
         mask: Column names whose value is replaced with null.
 
     Returns:
-        One dict per row, in collection order, columns in DataFrame
-        order.
+        One dict per row, in collection order, columns in DataFrame order.
     """
     rows = []
     for row in df.collect():

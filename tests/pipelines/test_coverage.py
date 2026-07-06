@@ -1,14 +1,4 @@
-"""Guard: every active pipeline must ship golden fixtures.
-
-The golden test in ``test_staging.py`` only runs for pipelines that
-ship the fixture trio (input, table config, expected output) - a
-pipeline without them would be silently skipped, never failed. This
-test closes that gap: it discovers every ACTIVE pipeline - a source
-registered in ``STAGING_SOURCES`` (run by the dynamic staging DAGs)
-or a directory shipping its own module (``pipelines/<name>/<name>.py``,
-exclusive treatment) - and fails if any of the three fixture files is
-missing, so a new pipeline cannot reach CI without golden coverage.
-"""
+"""Guard: every active pipeline must ship golden fixtures."""
 import os
 
 import pytest
@@ -25,11 +15,6 @@ REQUIRED_FIXTURES = (
 
 def discover_active_pipelines() -> list[str]:
     """List every active pipeline under pipelines/.
-
-    A pipeline is active when it is registered in ``STAGING_SOURCES``
-    (declarative source run by the dynamic staging DAGs) or when its
-    directory holds the module named after it
-    (`pipelines/<name>/<name>.py`) - exclusive-treatment pipelines.
 
     Returns:
         Sorted pipeline names.

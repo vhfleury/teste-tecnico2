@@ -1,34 +1,23 @@
-"""geocercas pipeline: the geofence registry.
-
-Two stages, one task each:
-
-* ``extract_to_raw``      — reads the source GeoJSON (unchanged values) and
-  writes it to the raw layer, one row per feature.
-* ``transform_to_staging`` — reads the raw layer, flattens the GeoJSON
-  feature shape (`flatten_features`, exclusive treatment of this source),
-  cleans/validates it (`clean_and_validate`), applies the table-config
-  treatments and writes the result to the staging layer.
-"""
+"""geocercas pipeline: the geofence registry."""
 from __future__ import annotations
 
 import logging
 import os
 
-from data_quality.validation import apply_table_validations, enforce_table_config
+from data_quality.validation import apply_table_validations
 from general.delta_io import (
     mark_delta_partition_processed,
-    read_delta_partition,
     write_delta_partition,
 )
 from general.utils import (
     DATA_DIR,
     layer_dir,
-    load_table_config,
 )
 from parser.treatment import apply_derived_columns, apply_table_treatments
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType
+from staging_pipeline import run_staging_transform
 
 log = logging.getLogger(__name__)
 
@@ -46,17 +35,7 @@ PROPERTY_FIELDS = ["geocerca_id", "nome", "tipo", "uf", "raio_km", "ativo"]
 
 
 def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
-    """Read geocercas.geojson and write it to the raw layer.
-
-    The source is a GeoJSON ``FeatureCollection`` — a single JSON
-    object wrapping a ``features`` array — so the file is read with
-    ``multiLine`` enabled and the array is exploded to one row per
-    feature (the raw grain is one geofence). Each feature keeps its
-    original nested shape (``type``, ``properties``, ``geometry``)
-    and every primitive is read as a string (``primitivesAsString``),
-    faithful to the source, so no dirty value (e.g. a zeroed
-    coordinate or an invalid radius) is masked by an early cast.
-    Typing and flattening happen in the staging stage.
+    """Read geocercas.geojson and write it to the raw layer, one row per feature.
 
     Args:
         spark: Active SparkSession (must be created with
@@ -111,13 +90,6 @@ def _struct_fields(df: DataFrame, column: str) -> list[str]:
 def flatten_features(raw: DataFrame) -> DataFrame:
     """Flatten the GeoJSON feature shape into staging columns.
 
-    Exclusive treatment of this source: promotes each ``properties.*``
-    field to a flat column and serializes ``geometry`` to a canonical
-    GeoJSON string with numeric coordinates (the raw layer reads every
-    primitive as a string). A field absent from the whole partition
-    becomes a null column, so the config validations flag it instead
-    of the job crashing on a missing path.
-
     Args:
         raw: Raw geofence DataFrame, as read from the raw layer
             (one row per feature).
@@ -154,13 +126,6 @@ def flatten_features(raw: DataFrame) -> DataFrame:
 def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
     """Standardize, validate and derive columns as the config declares.
 
-    Pure DataFrame -> DataFrame transformation, kept separate from
-    I/O so it can be unit-tested with synthetic data. The GeoJSON
-    flattening is the only source-exclusive step; every other rule
-    lives in the table config: treatments/cast/dedup first, then the
-    quarantine validations (invalid values are nulled but the row
-    keeps its primary key), and finally the derived columns.
-
     Args:
         raw: Raw geofence DataFrame, as read from the raw layer.
         config: Parsed table config (the staging contract).
@@ -189,59 +154,14 @@ def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
     Returns:
         Metrics about the write: layer name, destination table,
         ingestion date, input/output record counts and how many were
-        flagged for quality.
+        rejected (with percentage and count per reason).
     """
-    log.info(
-        "Starting transform - reading raw layer from %s (ingest_date=%s)",
-        RAW_DIR,
+    return run_staging_transform(
+        spark,
+        SOURCE,
         ingest_date,
+        raw_dir=RAW_DIR,
+        staging_dir=STAGING_DIR,
+        config_path=TABLE_CONFIG,
+        clean=clean_and_validate,
     )
-    raw = read_delta_partition(spark, RAW_DIR, ingest_date)
-    total_in = raw.count()
-    log.info("Raw layer read: %d records", total_in)
-
-    # The table config is the staging contract: declared treatments and
-    # validations are applied and wrong columns/types abort the write.
-    config = load_table_config(TABLE_CONFIG)
-    df = clean_and_validate(raw, config)
-    df = enforce_table_config(df, config)
-    log.info(
-        "Treatments applied and schema validated against table config '%s'",
-        config["table_name"],
-    )
-
-    log.info("Writing staging layer to %s (Delta)", STAGING_DIR)
-    write_delta_partition(df, STAGING_DIR, ingest_date)
-    mark_delta_partition_processed(STAGING_DIR, ingest_date)
-
-    total_out = df.count()
-    flagged = df.filter(~F.col("quality_ok")).count()
-
-    dropped = total_in - total_out
-    if dropped:
-        log.info("%d record(s) dropped (missing key or duplicate)", dropped)
-
-    if flagged:
-        reasons = (
-            df.filter(~F.col("quality_ok"))
-            .select(F.explode(F.split("dq_observations", ";")).alias("reason"))
-            .groupBy("reason")
-            .count()
-            .collect()
-        )
-        for row in sorted(reasons, key=lambda r: r["reason"]):
-            log.info("  quality - %s: %d", row["reason"], row["count"])
-
-    log.info(
-        "Transform finished - %d in staging, %d flagged for quality",
-        total_out,
-        flagged,
-    )
-    return {
-        "layer": "staging",
-        "path": STAGING_DIR,
-        "ingest_date": ingest_date,
-        "records_in": total_in,
-        "records_out": total_out,
-        "records_flagged": flagged,
-    }

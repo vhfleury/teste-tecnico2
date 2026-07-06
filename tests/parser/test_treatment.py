@@ -5,7 +5,7 @@ import pytest
 from parser.treatment import (
     apply_derived_columns,
     apply_table_treatments,
-    deduplicate_by_key,
+    drop_null_keys,
     trim_columns,
 )
 
@@ -20,10 +20,12 @@ TABLE_CONFIG = {
 }
 
 
-def test_apply_table_treatments_normalize_uppercases_text(spark):
+def test_apply_table_treatments_normalize_trims_and_uppercases_text(spark):
+    # normalize merges the former trim + normalize pair: a single
+    # normalize treatment both trims surrounding whitespace and uppercases.
     config = {
         "table_name": "staging_example",
-        "schema": [{"name": "nome", "type": "string", "treatments": ["trim", "normalize"]}],
+        "schema": [{"name": "nome", "type": "string", "treatments": ["normalize"]}],
     }
     df = spark.createDataFrame([("  Ana Souza ",), (None,)], ["nome"])
 
@@ -53,7 +55,34 @@ def test_apply_table_treatments_casts_to_declared_type(spark):
     ]
 
 
-def test_apply_table_treatments_deduplicates_by_declared_key(spark):
+def test_apply_table_treatments_parse_date_handles_dates_and_timestamps(spark):
+    # parse_date trims and parses; the declared type finalizes the
+    # precision (date drops the time, timestamp keeps the microseconds).
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {"name": "d", "type": "date", "treatments": ["parse_date"]},
+            {"name": "ts", "type": "timestamp", "treatments": ["parse_date"]},
+        ],
+    }
+    df = spark.createDataFrame(
+        [("  2025-10-23 ", "2026-04-28 21:34:58.588212"), ("not a date", None)],
+        "d string, ts string",
+    )
+
+    result = apply_table_treatments(df, config)
+
+    assert dict(result.dtypes)["d"] == "date"
+    assert dict(result.dtypes)["ts"] == "timestamp"
+    assert [(row["d"], row["ts"]) for row in result.collect()] == [
+        (datetime.date(2025, 10, 23), datetime.datetime(2026, 4, 28, 21, 34, 58, 588212)),
+        (None, None),  # unparseable/null becomes null, flagged later by validations
+    ]
+
+
+def test_apply_table_treatments_drops_keyless_rows_but_keeps_duplicates(spark):
+    # Null/empty keys are dropped here; duplicate keys are left in place
+    # for the `unique` validation to flag (so they reach the alert).
     config = {
         "table_name": "staging_example",
         "schema": [{"name": "id", "type": "string", "key": True}],
@@ -65,7 +94,7 @@ def test_apply_table_treatments_deduplicates_by_declared_key(spark):
 
     result = apply_table_treatments(df, config).collect()
 
-    assert sorted(row["id"] for row in result) == ["ID-1", "ID-2"]
+    assert sorted(row["id"] for row in result) == ["ID-1", "ID-1", "ID-2"]
 
 
 def test_apply_table_treatments_skips_absent_columns(spark):
@@ -99,6 +128,31 @@ def test_apply_table_treatments_normalize_telefone_via_config(spark):
     result = apply_table_treatments(df, config).collect()
 
     assert [row["telefone"] for row in result] == ["7128271996"]
+
+
+def test_apply_table_treatments_casts_string_to_boolean(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {"name": "geocerca_id", "type": "string"},
+            {"name": "ativo", "type": "boolean"},
+        ],
+    }
+    df = spark.createDataFrame(
+        [("GEO-1", "true"), ("GEO-2", "false"), ("GEO-3", "sim"), ("GEO-4", None)],
+        ["geocerca_id", "ativo"],
+    )
+
+    result = apply_table_treatments(df, config).collect()
+
+    # A non-boolean token ("sim") casts to null and is flagged later by the
+    # validations, instead of aborting the job (Spark 3.5, ANSI off).
+    assert [(row["geocerca_id"], row["ativo"]) for row in result] == [
+        ("GEO-1", True),
+        ("GEO-2", False),
+        ("GEO-3", None),
+        ("GEO-4", None),
+    ]
 
 
 def test_apply_derived_columns_creates_new_column_from_source(spark):
@@ -139,7 +193,7 @@ def test_trim_columns_strips_only_the_given_columns(spark):
     ]
 
 
-def test_deduplicate_by_key_drops_null_empty_and_duplicate_keys(spark):
+def test_drop_null_keys_drops_null_and_empty_keeps_duplicates(spark):
     df = spark.createDataFrame(
         [
             ("ID-1", "kept"),
@@ -151,26 +205,30 @@ def test_deduplicate_by_key_drops_null_empty_and_duplicate_keys(spark):
         ["id", "label"],
     )
 
-    result = deduplicate_by_key(df, ["id"]).collect()
+    result = drop_null_keys(df, ["id"]).collect()
 
-    assert sorted(row["id"] for row in result) == ["ID-1", "ID-2"]
+    # Null/empty keys go; duplicates stay (flagged later by `unique`).
+    assert sorted(row["id"] for row in result) == ["ID-1", "ID-1", "ID-2"]
 
 
-def test_deduplicate_by_key_requires_every_column_of_a_composite_key(spark):
+def test_drop_null_keys_requires_every_column_of_a_composite_key(spark):
     df = spark.createDataFrame(
         [
             ("ID-1", "2024-01-01", "kept"),
             ("ID-1", "2024-01-02", "kept, other second key"),
-            ("ID-1", "2024-01-01", "duplicate composite key"),
+            ("ID-1", "2024-01-01", "duplicate composite key kept"),
             ("ID-1", None, "null second key"),
             ("ID-1", "", "empty second key"),
         ],
         ["id", "event_date", "label"],
     )
 
-    result = deduplicate_by_key(df, ["id", "event_date"]).collect()
+    result = drop_null_keys(df, ["id", "event_date"]).collect()
 
+    # A null/empty part of the composite key drops the row; the repeated
+    # (ID-1, 2024-01-01) pair is kept for the `unique` validation.
     assert sorted((row["id"], row["event_date"]) for row in result) == [
+        ("ID-1", "2024-01-01"),
         ("ID-1", "2024-01-01"),
         ("ID-1", "2024-01-02"),
     ]

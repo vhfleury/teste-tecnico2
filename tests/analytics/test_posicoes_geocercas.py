@@ -1,27 +1,18 @@
-"""Dedicated tests for the posicoes_geocercas analytics table.
-
-Analytics has exclusive treatment (joins and business rules live in
-code, not in the config), so it is not covered by the generic staging
-golden test. Two tests: a spatial check of the Sedona-based matcher
-(inside, outside and boundary points) and a golden test that runs the
-full `build_analytics` chain over the input fixture — one key per
-staging table consumed — and compares the result with the frozen
-expected output, keyed by `posicao_id`.
-"""
+"""Dedicated tests for the posicoes_geocercas analytics table."""
 import json
 import os
 
 from general.utils import load_table_config
 from pyspark.sql import functions as F
 
-from analytics.posicoes_geocercas import (
+from analytics.posicoes_geocercas.posicoes_geocercas import (
     build_analytics,
     match_positions_to_geofences,
 )
 from tests.pipelines.diff import assert_matches_expected, dataframe_to_rows
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ANALYTICS_ROOT = os.path.join(ROOT, "analytics")
+ANALYTICS_ROOT = os.path.join(ROOT, "analytics", "posicoes_geocercas")
 
 # Runtime metadata: the column must exist in the output (config is the
 # contract), but its value is generated at execution time, so it is
@@ -74,7 +65,7 @@ def test_spatial_match_handles_inside_outside_and_boundary_points(spark):
             {
                 "geocerca_id": "GEO-A",
                 "nome": "Terminal A",
-                "tipo": "centro_distribuicao",
+                "tipo": "CENTRO_DISTRIBUICAO",
                 "uf": "SP",
                 "raio_km": 1.0,
                 "ativo": True,

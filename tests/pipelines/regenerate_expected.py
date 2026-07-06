@@ -1,17 +1,4 @@
-"""Regenerate a pipeline's expected golden file from its input fixture.
-
-The table config is the source of truth: after an INTENTIONAL change
-to the contract (columns, treatments, validations) or to the engine,
-run this to make the expected output reflect it - then review the
-resulting diff before trusting it. If the golden test fails and the
-change was NOT intentional, fix the code instead of regenerating.
-
-Also creates the very first golden of a new pipeline (only the input
-and config fixtures are required to exist).
-
-Usage (inside the container):
-    python -m tests.pipelines.regenerate_expected <pipeline>
-"""
+"""Regenerate a pipeline's expected golden file from its input fixture."""
 import json
 import os
 import sys

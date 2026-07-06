@@ -1,25 +1,4 @@
-"""viagens_enriquecidas analytics: consolidated trips fact.
-
-One stage, one task:
-
-* ``transform_to_analytics`` — reads the five staging inputs, enriches
-  each trip with its vehicle, driver, origin/destination geofences and
-  per-trip tracking metrics (`enrich_trips`) and writes the result to
-  the analytics layer as a Delta table.
-
-Staging standardized the FORM of every input; this module applies the
-SEMANTICS: dimension lookups, per-trip position aggregates and derived
-trip metrics. Joins and business rules live here in code — the table
-config declares only names and types. Every join is a LEFT JOIN from
-the fact (trips), so no row is ever dropped: referential orphans are
-flagged in ``dq_observations`` (merged with the observations inherited
-from staging) with ``quality_ok`` set to false.
-
-Position aggregates are computed at the trip grain BEFORE the join, so
-the fact never fans out. Staging already guarantees unique, non-null
-primary keys on every dimension (`deduplicate_by_key`), so dimension
-joins cannot fan out either.
-"""
+"""viagens_enriquecidas analytics: consolidated trips fact."""
 from __future__ import annotations
 
 import logging
@@ -116,10 +95,6 @@ def _driver_dimension(drivers: DataFrame) -> DataFrame:
 def _geofence_dimension(geofences: DataFrame, role: str, key_column: str) -> DataFrame:
     """Project geofences as the trip's origin or destination dimension.
 
-    Inactive and quarantined geofences are kept: a trip that references
-    them still deserves the descriptive attributes — referential
-    integrity only breaks when the id is unknown.
-
     Args:
         geofences: Staging geofences DataFrame.
         role: Column prefix for the projected attributes (`origem` or
@@ -144,11 +119,6 @@ def _geofence_dimension(geofences: DataFrame, role: str, key_column: str) -> Dat
 def aggregate_positions_by_trip(positions: DataFrame) -> DataFrame:
     """Aggregate tracking positions to the trip grain before the join.
 
-    Invalid readings (absurd speeds, bad coordinates) were already
-    nullified by the staging quarantine, so the average naturally
-    skips them; positions without a trip id cannot be attributed and
-    are left out.
-
     Args:
         positions: Staging positions DataFrame.
 
@@ -170,12 +140,6 @@ def aggregate_positions_by_trip(positions: DataFrame) -> DataFrame:
 
 def _merge_quarantine(df: DataFrame) -> DataFrame:
     """Flag referential orphans without losing the staging observations.
-
-    The staging quarantine columns were renamed before the joins;
-    here the new join-based reasons are appended to them so a trip
-    flagged upstream (e.g. missing_start_date) keeps that history.
-    `quality_ok` is recomputed from the merged observations: true only
-    when staging passed AND every reference resolved.
 
     Args:
         df: Enriched DataFrame carrying the `staging_dq_observations`
@@ -225,18 +189,6 @@ def enrich_trips(
 ) -> DataFrame:
     """Enrich each trip with dimensions, tracking aggregates and metrics.
 
-    Business rules applied on top of the LEFT JOINs from the fact:
-
-    * ``duracao_horas`` / ``duracao_prevista_horas`` — actual/planned
-      trip duration from ``data_inicio``.
-    * ``atraso_horas`` — signed actual-vs-planned end difference
-      (negative means early), null while the trip has no actual end.
-    * ``atrasada_flag`` — explicit `atrasada` status OR actual end
-      after the planned end (a late trip closed as `concluida` still
-      counts as delayed).
-    * ``mes`` — `yyyy-MM` month of ``data_inicio`` (UTC session), the
-      bucket used by the monthly metric tables.
-
     Args:
         trips: Staging trips DataFrame (the fact).
         vehicles: Staging vehicles DataFrame.
@@ -268,7 +220,7 @@ def enrich_trips(
         .join(aggregate_positions_by_trip(positions), "viagem_id", "left")
     )
 
-    is_delayed_status = F.coalesce(F.col("status") == F.lit("atrasada"), F.lit(False))
+    is_delayed_status = F.coalesce(F.col("status") == F.lit("ATRASADA"), F.lit(False))
     ended_late = F.coalesce(F.col("data_fim_real") > F.col("data_fim_prevista"), F.lit(False))
     enriched = (
         enriched.withColumn("duracao_horas", _hours_between("data_inicio", "data_fim_real"))
@@ -293,10 +245,6 @@ def build_analytics(
 ) -> DataFrame:
     """Build the analytics output and enforce the declared contract.
 
-    Pure DataFrame -> DataFrame transformation, kept separate from
-    I/O so it can be tested with synthetic data. The table config is
-    the analytics contract: wrong columns/types abort the write.
-
     Args:
         viagens: Staging trips DataFrame (the fact).
         veiculos: Staging vehicles DataFrame.
@@ -315,10 +263,6 @@ def build_analytics(
 
 def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     """Read staging inputs, build the enriched trips and write the partition.
-
-    The output is a Delta table: the write atomically replaces only
-    this `ingest_date` partition and the marker is set right after
-    the commit (Delta writes no `_SUCCESS` file).
 
     Args:
         spark: Active SparkSession (must be created with

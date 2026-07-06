@@ -1,19 +1,4 @@
-"""posicoes_geocercas analytics: geospatial enrichment of tracking positions.
-
-One stage, one task:
-
-* ``transform_to_analytics`` — reads the staging positions and geofences,
-  enriches each position with the geofence that contains it
-  (`enrich_positions_with_geofences`) and writes the result to the
-  analytics layer as a Delta table.
-
-Staging standardized the FORM of both inputs; this module applies the
-SEMANTICS: point-in-polygon matching via Apache Sedona, location
-classification (`em_geocerca` / `em_rota`) and geofence entry/exit
-events along each trip. Joins and business rules live here in code —
-the table config declares only names and types. Every join is a LEFT
-JOIN from the fact (positions), so no row is ever dropped.
-"""
+"""posicoes_geocercas analytics: geospatial enrichment of tracking positions."""
 from __future__ import annotations
 
 import logging
@@ -63,11 +48,6 @@ GEOJSON_POLYGON_SCHEMA = StructType(
 def _is_valid_geojson_polygon(geometry: Column) -> Column:
     """Build a predicate that structurally validates a GeoJSON Polygon.
 
-    Defensive by design: unparseable JSON, wrong geometry type, missing
-    coordinates, non-numeric points, rings with fewer than 4 points or
-    unclosed rings are all flagged invalid instead of raising, so the
-    matcher can exclude them before Sedona parses the geometry.
-
     Args:
         geometry: Column with the GeoJSON Polygon serialized as a JSON
             string, as canonicalized by the geocercas staging.
@@ -94,12 +74,6 @@ def _is_valid_geojson_polygon(geometry: Column) -> Column:
 
 def _active_geofences(geofences: DataFrame) -> DataFrame:
     """Prepare active, quality-approved geofences for spatial matching.
-
-    Only geofences that passed staging quality, are active and carry a
-    structurally valid geometry can contain a position; the GeoJSON is
-    parsed once here into a Sedona geometry. Geofences with malformed
-    geometry are excluded from matching — they cannot contain any
-    point.
 
     Args:
         geofences: Staging geofences DataFrame.
@@ -153,22 +127,6 @@ def _position_base(positions: DataFrame) -> DataFrame:
 def match_positions_to_geofences(positions: DataFrame, geofences: DataFrame) -> DataFrame:
     """Left-enrich each position with the best containing geofence, if any.
 
-    The spatial match is delegated to Apache Sedona:
-
-    1. Each position with coordinates becomes an ``ST_Point`` and each
-       matchable geofence a Sedona geometry (``ST_GeomFromGeoJSON``).
-    2. ``ST_Intersects`` joins the points against the (small,
-       broadcast) geofence table — Sedona plans an indexed spatial
-       join, replacing the manual bounding-box prefilter. Boundary
-       points intersect their polygon, so they count as inside. Ties
-       (overlapping geofences) are broken by the smallest radius, then
-       by geofence id, keeping exactly one match per position.
-
-    The join back to the positions is a LEFT JOIN from the fact:
-    positions without a containing geofence (including quarantined
-    rows with null coordinates) keep null geocerca_* columns and no
-    row is ever dropped.
-
     Args:
         positions: Staging positions DataFrame.
         geofences: Staging geofences DataFrame.
@@ -208,16 +166,6 @@ def match_positions_to_geofences(positions: DataFrame, geofences: DataFrame) -> 
 
 def enrich_positions_with_geofences(positions: DataFrame, geofences: DataFrame) -> DataFrame:
     """Classify positions and detect geofence entry/exit events.
-
-    Business rules applied on top of the spatial match:
-
-    * ``classificacao_localizacao`` — `em_geocerca` when a geofence
-      contains the position, `em_rota` otherwise.
-    * ``evento_entrada_geocerca`` / ``evento_saida_geocerca`` — the
-      previous position of the same trip (window ordered by timestamp,
-      tie-broken by `posicao_id`) decides the transition; moving
-      straight between two geofences flags both an exit and an entry
-      on the same position.
 
     Args:
         positions: Staging positions DataFrame.
@@ -263,10 +211,6 @@ def enrich_positions_with_geofences(positions: DataFrame, geofences: DataFrame) 
 def build_analytics(posicoes: DataFrame, geocercas: DataFrame, config: dict) -> DataFrame:
     """Build the analytics output and enforce the declared contract.
 
-    Pure DataFrame -> DataFrame transformation, kept separate from
-    I/O so it can be tested with synthetic data. The table config is
-    the analytics contract: wrong columns/types abort the write.
-
     Args:
         posicoes: Staging positions DataFrame.
         geocercas: Staging geofences DataFrame.
@@ -280,10 +224,6 @@ def build_analytics(posicoes: DataFrame, geocercas: DataFrame, config: dict) -> 
 
 def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     """Read staging inputs, build geospatial analytics and write the partition.
-
-    The output is a Delta table: the write atomically replaces only
-    this `ingest_date` partition and the marker is set right after
-    the commit (Delta writes no `_SUCCESS` file).
 
     Args:
         spark: Active SparkSession (must be created with
