@@ -7,8 +7,8 @@ Flow across the lakehouse layers, partitioned by ingestion date::
       |-(enrich_to_analytics)-> lakehouse/analytics/posicoes_geocercas/ingest_date=YYYY-MM-DD
 
 The DAG is thin on purpose: all PySpark enrichment logic lives in
-``analytics/posicoes_geocercas.py`` and the analytics table contract in
-``analytics_posicoes_geocercas.json``.
+``analytics/posicoes_geocercas/posicoes_geocercas.py`` and the analytics
+table contract in ``analytics_posicoes_geocercas.json``.
 
 Data-aware scheduling: instead of a cron, the DAG runs when the
 ``staging_posicoes`` and ``staging_geocercas`` Assets are published by
@@ -36,7 +36,10 @@ import pendulum
 from airflow.exceptions import AirflowSkipException
 from airflow.sdk import Asset, dag, task
 
-from analytics.posicoes_geocercas import ANALYTICS_DIR, transform_to_analytics
+from analytics.posicoes_geocercas.posicoes_geocercas import (
+    ANALYTICS_DIR,
+    transform_to_analytics,
+)
 from connections.spark_session import run_spark
 from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import resolve_ingest_date

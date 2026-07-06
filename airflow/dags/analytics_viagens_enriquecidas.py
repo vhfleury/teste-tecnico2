@@ -10,8 +10,8 @@ Flow across the lakehouse layers, partitioned by ingestion date::
       |-(enrich_to_analytics)-> lakehouse/analytics/viagens_enriquecidas (Delta)
 
 The DAG is thin on purpose: all PySpark enrichment logic lives in
-``analytics/viagens_enriquecidas.py`` and the analytics table contract
-in ``analytics_viagens_enriquecidas.json``.
+``analytics/viagens_enriquecidas/viagens_enriquecidas.py`` and the
+analytics table contract in ``analytics_viagens_enriquecidas.json``.
 
 Data-aware scheduling: instead of a cron, the DAG runs when the five
 staging Assets are published by the staging DAGs, so analytics never
@@ -39,7 +39,10 @@ import pendulum
 from airflow.exceptions import AirflowSkipException
 from airflow.sdk import Asset, dag, task
 
-from analytics.viagens_enriquecidas import ANALYTICS_DIR, transform_to_analytics
+from analytics.viagens_enriquecidas.viagens_enriquecidas import (
+    ANALYTICS_DIR,
+    transform_to_analytics,
+)
 from connections.spark_session import run_spark
 from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import resolve_ingest_date

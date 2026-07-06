@@ -8,8 +8,8 @@ Flow across the lakehouse layers, partitioned by ingestion date::
       |-(aggregate_to_analytics)-> lakehouse/analytics/<metric table> (Delta, x6)
 
 The DAG is thin on purpose: all PySpark aggregation logic lives in
-``analytics/metricas_viagens.py`` — one Delta table per metric,
-registered in ``METRIC_TABLES``, each with its own config contract.
+``analytics/metricas_viagens/metricas_viagens.py`` — one Delta table per
+metric, registered in ``METRIC_TABLES``, each with its own config contract.
 
 Data-aware scheduling: the DAG runs when the
 ``analytics_viagens_enriquecidas`` and ``analytics_posicoes_geocercas``
@@ -40,7 +40,10 @@ import pendulum
 from airflow.exceptions import AirflowSkipException
 from airflow.sdk import Asset, dag, task
 
-from analytics.metricas_viagens import METRIC_TABLES, transform_to_analytics
+from analytics.metricas_viagens.metricas_viagens import (
+    METRIC_TABLES,
+    transform_to_analytics,
+)
 from connections.spark_session import run_spark
 from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import layer_dir, resolve_ingest_date
