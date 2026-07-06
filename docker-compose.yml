@@ -141,8 +141,13 @@ services:
         # `python -m airflow` (e nao o script `airflow`): o console script
         # depende do sys.path do usuario efetivo e quebra fora do uid airflow.
         python -m airflow dags reserialize || true
+        # Unpause every DAG so the scheduler can react to asset events.
         python -m airflow dags unpause --treat-dag-id-as-regex -y ".*" || true
-        for dag_id in $$(python -m airflow dags list --output plain 2>/dev/null | awk 'NR>1 {print $$1}' | sort -u); do
+        # Kick only the staging (root) DAGs. A manual trigger ignores the asset
+        # schedule, so triggering the analytics DAGs here would run them before
+        # their staging inputs exist. Triggering just the roots lets the staging
+        # outlets cascade to the analytics DAGs in dependency order.
+        for dag_id in $$(python -m airflow dags list --output plain 2>/dev/null | awk 'NR>1 {print $$1}' | grep -v '^analytics_' | sort -u); do
           python -m airflow dags trigger "$$dag_id" || true
         done
     depends_on:
