@@ -2,6 +2,7 @@ x-airflow-common:
   &airflow-common
   image: ${AIRFLOW_IMAGE_NAME:-bigcore-airflow-pyspark:3.1.5}
   build: .
+  pull_policy: build
   env_file:
     - ${ENV_FILE_PATH:-.env}
   environment:
