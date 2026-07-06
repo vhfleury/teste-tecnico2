@@ -1,13 +1,4 @@
-"""Dedicated tests for the posicoes_geocercas analytics table.
-
-Analytics has exclusive treatment (joins and business rules live in
-code, not in the config), so it is not covered by the generic staging
-golden test. Two tests: a spatial check of the Sedona-based matcher
-(inside, outside and boundary points) and a golden test that runs the
-full `build_analytics` chain over the input fixture — one key per
-staging table consumed — and compares the result with the frozen
-expected output, keyed by `posicao_id`.
-"""
+"""Dedicated tests for the posicoes_geocercas analytics table."""
 import json
 import os
 

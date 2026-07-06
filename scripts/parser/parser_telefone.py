@@ -7,12 +7,7 @@ from pyspark.sql import functions as F
 
 
 def normalize_telefone(telefone: Column) -> Column:
-    """Reduce a phone number to DDD + subscriber digits.
-
-    Strips punctuation, the optional `+55` country code and the
-    trunk zero (e.g. `(071)` becomes `71`), so
-    `+55 (071) 2827-1996` and `71 2827 1996` normalize to the same
-    `7128271996`.
+    """Reduce a phone number to DDD + subscriber digits, stripping punctuation, `+55` and the trunk zero.
 
     Args:
         telefone: Column with the phone number in any common format.
@@ -55,11 +50,7 @@ def ddd_to_uf(ddd: Column) -> Column:
 
 
 def telefone_is_valid(telefone: Column) -> Column:
-    """Validate a Brazilian phone number: DDD + 8/9-digit subscriber.
-
-    After normalization the number must have 10 digits (landline) or
-    11 digits (mobile), an existing DDD, and a subscriber number that
-    does not start with 0 or 1 (mobiles must start with 9).
+    """Validate a Brazilian phone number: existing DDD + 8/9-digit subscriber.
 
     Args:
         telefone: Column with the phone number in any common format.

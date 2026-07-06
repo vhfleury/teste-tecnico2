@@ -39,10 +39,6 @@ def load_table_config(path: str) -> dict:
 def resolve_ingest_date(context: dict) -> str:
     """Resolve the run's ingestion date from the task context.
 
-    Manual runs triggered without a logical date (e.g. ``airflow dags
-    trigger`` on the CLI) have ``logical_date=None`` and therefore no
-    ``ds`` in the context, so fall back to the run's ``run_after``.
-
     Args:
         context: Airflow task context.
 

@@ -1,14 +1,4 @@
-"""Generic data treatments shared by every pipeline.
-
-This module executes what a table config declares for each column:
-the ``treatments`` chain (keys of ``TREATMENTS``, applied in order),
-the cast to the declared ``type`` and dropping rows without a value
-for the declared ``key`` columns (`apply_table_treatments`; duplicate
-keys are flagged by the ``unique`` validation, not dropped here), plus
-the ``new_name`` derived columns (`apply_derived_columns`). Validations
-that flag or abort instead of changing values live in
-``data_quality/validation.py``.
-"""
+"""Generic data treatments shared by every pipeline, driven by the table config."""
 from __future__ import annotations
 
 from parser.parser_cpf import normalize_cpf
@@ -20,10 +10,6 @@ from pyspark.sql import functions as F
 def normalize(column: Column) -> Column:
     """Normalize a text column: trim surrounding whitespace and uppercase.
 
-    Merges the former ``trim`` and ``normalize`` treatments into one, so
-    a column only needs to declare ``normalize`` to be trimmed and
-    uppercased.
-
     Args:
         column: String column to normalize.
 
@@ -34,13 +20,7 @@ def normalize(column: Column) -> Column:
 
 
 def parse_date(column: Column) -> Column:
-    """Parse a date/datetime string into a timestamp.
-
-    Trims surrounding whitespace and parses the value with Spark's
-    lenient ISO parser; the column's declared ``type`` (``date`` or
-    ``timestamp``) then finalizes the precision in
-    `apply_table_treatments`. A malformed value becomes null and is
-    flagged by the validations, instead of aborting the job.
+    """Parse a date/datetime string into a timestamp (malformed -> null, not an abort).
 
     Args:
         column: String column holding the date or datetime.
@@ -75,9 +55,7 @@ def _apply_entry_treatments(column: Column, entry: dict, table: str) -> Column:
         The column with every declared treatment applied, in order.
 
     Raises:
-        ValueError: If a declared treatment is not in `TREATMENTS` -
-            the config demands exactly that treatment, so an unknown
-            one must abort instead of being skipped.
+        ValueError: If a declared treatment is not in `TREATMENTS`.
     """
     for treatment in entry.get("treatments", []):
         if treatment not in TREATMENTS:
@@ -105,13 +83,7 @@ def trim_columns(df: DataFrame, columns: list[str]) -> DataFrame:
 
 
 def drop_null_keys(df: DataFrame, key_columns: list[str]) -> DataFrame:
-    """Drop rows whose primary key is null or empty.
-
-    A row without a key cannot be keyed, deduplicated or joined, so it
-    is removed before the quality checks run. Duplicate keys are NOT
-    dropped here: the ``unique`` validation flags them as a quality
-    issue (reason recorded in ``dq_observations``) so the rejected rows
-    are counted in the data-quality alert instead of vanishing silently.
+    """Drop rows whose primary key is null or empty (duplicate keys are flagged by the ``unique`` validation, not dropped here).
 
     Args:
         df: DataFrame to transform.
@@ -128,18 +100,7 @@ def drop_null_keys(df: DataFrame, key_columns: list[str]) -> DataFrame:
 
 
 def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
-    """Standardize the DataFrame as declared in the table config.
-
-    For every schema entry whose column exists in the DataFrame:
-    apply the declared ``treatments`` in order, then cast to the
-    declared ``type`` (the raw layer reads every primitive as a
-    string, so typing happens here). Entries with ``new_name`` are
-    derived columns, handled later by `apply_derived_columns`;
-    entries absent from the DataFrame (partition and metadata columns
-    added downstream) are skipped - `enforce_table_config` catches a
-    genuinely missing column before the write. Finally, rows without a
-    value for the entries marked ``key`` are dropped (duplicate keys are
-    flagged by the ``unique`` validation, not dropped here).
+    """Apply each entry's treatments, cast to the declared type and drop keyless rows.
 
     Args:
         df: DataFrame read from the raw layer.
@@ -173,12 +134,7 @@ def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
 
 
 def apply_derived_columns(df: DataFrame, config: dict) -> DataFrame:
-    """Create the ``new_name`` derived columns declared in the config.
-
-    Runs after the validations so a derived column (e.g. the
-    digits-only CPF) is computed from the final, quarantined value of
-    its source column - an invalid source that was nulled out derives
-    null, not a normalized copy of a bad value.
+    """Create the ``new_name`` derived columns; runs after the validations so a nulled-out source derives null.
 
     Args:
         df: DataFrame already treated and validated.

@@ -1,37 +1,4 @@
-"""DAG ``analytics_metricas_viagens`` - aggregated trip metric tables.
-
-Flow across the lakehouse layers, partitioned by ingestion date::
-
-    lakehouse/analytics/viagens_enriquecidas (Delta)
-    lakehouse/analytics/posicoes_geocercas/ingest_date=YYYY-MM-DD
-    lakehouse/staging/veiculos/ingest_date=YYYY-MM-DD
-      |-(aggregate_to_analytics)-> lakehouse/analytics/<metric table> (Delta, x6)
-
-The DAG is thin on purpose: all PySpark aggregation logic lives in
-``analytics/metricas_viagens/metricas_viagens.py`` — one Delta table per
-metric, registered in ``METRIC_TABLES``, each with its own config contract.
-
-Data-aware scheduling: the DAG runs when the
-``analytics_viagens_enriquecidas`` and ``analytics_posicoes_geocercas``
-Assets are published. The staging vehicles input is a transitive
-dependency: the enriched trips Asset only publishes after
-``staging_veiculos`` wrote the same partition, so it needs no explicit
-edge here.
-
-Each metric table is Delta: every run atomically replaces only its own
-``ingest_date`` partition (``replaceWhere``), so reprocessing a date
-can never duplicate or corrupt other partitions.
-
-**Idempotency via pre-check:** Delta writes no ``_SUCCESS`` marker, so
-before doing any work the task checks the gold partition marker of
-every metric table (``_markers/<ingest_date>``). Only when all six are
-present is the run skipped (``AirflowSkipException``); a partially
-written date is rebuilt whole, which is safe by the atomic
-partition replacement.
-
-The task publishes the ``analytics_metricas_viagens`` Asset, the
-data-aware trigger for downstream consumers of the metric tables.
-"""
+"""DAG ``analytics_metricas_viagens`` - builds the six aggregated trip-metric Delta tables, scheduled on the enriched-trips and positions-geofences Assets."""
 from __future__ import annotations
 
 import logging

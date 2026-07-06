@@ -1,18 +1,4 @@
-"""Dynamic staging DAGs for declarative sources.
-
-The DAGs generated here share the same operational flow:
-
-    source file
-      |-(extract_to_raw)-> lakehouse/raw/<source>/ingest_date=YYYY-MM-DD
-          |-(transform_to_staging)-> lakehouse/staging/<source>/ingest_date=YYYY-MM-DD
-              |                      (quality_ok rows only; rejected rows are
-              |                       discarded, never persisted)
-              |-(data_quality)-> log alert with the rejected count, reasons and
-                                 percentage, from the transform metrics (XCom)
-
-PySpark logic lives in ``pipelines/staging_pipeline.py`` and each table
-contract lives in ``pipelines/<source>/staging_<source>.json``.
-"""
+"""Generates one staging ingestion DAG per active declarative source (raw -> staging + data-quality alert)."""
 from __future__ import annotations
 
 import logging

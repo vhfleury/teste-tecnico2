@@ -1,16 +1,4 @@
-"""geocercas pipeline: the geofence registry.
-
-Two stages, one task each:
-
-* ``extract_to_raw``      — reads the source GeoJSON (unchanged values) and
-  writes it to the raw layer, one row per feature.
-* ``transform_to_staging`` — reads the raw layer, flattens the GeoJSON
-  feature shape (`flatten_features`, exclusive treatment of this source),
-  cleans/validates it (`clean_and_validate`), applies the table-config
-  treatments and writes the result to the staging layer. Only rows with
-  ``quality_ok`` True reach staging; rejected rows are discarded after
-  the data-quality alert is logged.
-"""
+"""geocercas pipeline: the geofence registry."""
 from __future__ import annotations
 
 import logging
@@ -47,17 +35,7 @@ PROPERTY_FIELDS = ["geocerca_id", "nome", "tipo", "uf", "raio_km", "ativo"]
 
 
 def extract_to_raw(spark: SparkSession, ingest_date: str) -> dict:
-    """Read geocercas.geojson and write it to the raw layer.
-
-    The source is a GeoJSON ``FeatureCollection`` — a single JSON
-    object wrapping a ``features`` array — so the file is read with
-    ``multiLine`` enabled and the array is exploded to one row per
-    feature (the raw grain is one geofence). Each feature keeps its
-    original nested shape (``type``, ``properties``, ``geometry``)
-    and every primitive is read as a string (``primitivesAsString``),
-    faithful to the source, so no dirty value (e.g. a zeroed
-    coordinate or an invalid radius) is masked by an early cast.
-    Typing and flattening happen in the staging stage.
+    """Read geocercas.geojson and write it to the raw layer, one row per feature.
 
     Args:
         spark: Active SparkSession (must be created with
@@ -112,13 +90,6 @@ def _struct_fields(df: DataFrame, column: str) -> list[str]:
 def flatten_features(raw: DataFrame) -> DataFrame:
     """Flatten the GeoJSON feature shape into staging columns.
 
-    Exclusive treatment of this source: promotes each ``properties.*``
-    field to a flat column and serializes ``geometry`` to a canonical
-    GeoJSON string with numeric coordinates (the raw layer reads every
-    primitive as a string). A field absent from the whole partition
-    becomes a null column, so the config validations flag it instead
-    of the job crashing on a missing path.
-
     Args:
         raw: Raw geofence DataFrame, as read from the raw layer
             (one row per feature).
@@ -155,14 +126,6 @@ def flatten_features(raw: DataFrame) -> DataFrame:
 def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
     """Standardize, validate and derive columns as the config declares.
 
-    Pure DataFrame -> DataFrame transformation, kept separate from
-    I/O so it can be unit-tested with synthetic data. The GeoJSON
-    flattening is the only source-exclusive step; every other rule
-    lives in the table config: treatments/cast and the keyless-row
-    drop first, then the quarantine validations (invalid values are
-    nulled but the row keeps its primary key; duplicate keys are
-    flagged by the ``unique`` check), and finally the derived columns.
-
     Args:
         raw: Raw geofence DataFrame, as read from the raw layer.
         config: Parsed table config (the staging contract).
@@ -180,11 +143,6 @@ def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
 
 def transform_to_staging(spark: SparkSession, ingest_date: str) -> dict:
     """Read the raw layer, clean/validate it and write staging.
-
-    Delegates to the shared staging transform
-    (`staging_pipeline.run_staging_transform`) with this source's
-    paths and its exclusive `clean_and_validate` chain (GeoJSON
-    flattening before the generic engine).
 
     Args:
         spark: Active SparkSession (must be created with

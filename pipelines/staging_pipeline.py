@@ -1,17 +1,4 @@
-"""Generic staging pipeline driven by source and table config.
-
-This module owns the shared raw -> staging flow for declarative
-sources. Source-specific rules stay in ``staging_<source>.json``;
-this runner only knows how to read each raw input format, add runtime
-metadata, apply the generic treatment/validation engine and write the
-staging partition. Rows that fail validation (``quality_ok`` False)
-never reach staging: they are DISCARDED, and the transform returns
-their rejection metrics (count, reasons, share of the total) so the
-``data_quality`` DAG task can log the alert — nothing is persisted.
-All layers are Delta tables: every write replaces only its own
-``ingest_date`` partition and sets the processed marker right after
-the commit.
-"""
+"""Generic staging pipeline driven by source and table config."""
 from __future__ import annotations
 
 import logging
@@ -217,14 +204,6 @@ def run_staging_transform(
 ) -> dict:
     """Run the shared raw -> staging transform flow for one source.
 
-    Single implementation of the staging write, consumed by the
-    generic `transform_to_staging` and by pipelines with exclusive
-    treatment (e.g. geocercas): read the raw partition, apply the
-    source's ``clean`` chain, enforce the table config, split by
-    ``quality_ok``, write only the approved rows to staging and
-    measure the rejected rows before discarding them (the DAG's
-    ``data_quality`` task logs the alert from the returned metrics).
-
     Args:
         spark: Active SparkSession (must be created with
             ``enable_delta=True``).
@@ -294,10 +273,6 @@ def run_staging_transform(
 
 def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> dict:
     """Read raw, apply the source table config and write staging.
-
-    Only rows with ``quality_ok`` True are written to staging;
-    rejected rows are discarded after the data-quality alert is
-    logged, so downstream consumers never see an inconsistent record.
 
     Args:
         spark: Active SparkSession (must be created with

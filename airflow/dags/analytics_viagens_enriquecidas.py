@@ -1,36 +1,4 @@
-"""DAG ``analytics_viagens_enriquecidas`` - consolidated trips enrichment.
-
-Flow across the lakehouse layers, partitioned by ingestion date::
-
-    lakehouse/staging/viagens/ingest_date=YYYY-MM-DD
-    lakehouse/staging/veiculos/ingest_date=YYYY-MM-DD
-    lakehouse/staging/motoristas/ingest_date=YYYY-MM-DD
-    lakehouse/staging/geocercas/ingest_date=YYYY-MM-DD
-    lakehouse/staging/posicoes/ingest_date=YYYY-MM-DD
-      |-(enrich_to_analytics)-> lakehouse/analytics/viagens_enriquecidas (Delta)
-
-The DAG is thin on purpose: all PySpark enrichment logic lives in
-``analytics/viagens_enriquecidas/viagens_enriquecidas.py`` and the
-analytics table contract in ``analytics_viagens_enriquecidas.json``.
-
-Data-aware scheduling: instead of a cron, the DAG runs when the five
-staging Assets are published by the staging DAGs, so analytics never
-reads a partition that has not been written yet.
-
-The gold table is Delta: each run atomically replaces only its own
-``ingest_date`` partition (``replaceWhere``), so reprocessing a date
-can never duplicate or corrupt other partitions.
-
-**Idempotency via pre-check:** Delta writes no ``_SUCCESS`` marker, so
-before doing any work the task checks the gold partition marker
-written after the Delta commit (``_markers/<ingest_date>``). If it
-exists, the task is skipped (``AirflowSkipException``) instead of
-reprocessing.
-
-The task publishes the ``analytics_viagens_enriquecidas`` Asset, the
-data-aware trigger for downstream consumers of the enriched trips
-(e.g. the aggregated metrics DAG).
-"""
+"""DAG ``analytics_viagens_enriquecidas`` - consolidates trips enriched with vehicle, driver, geofence and trip metrics, scheduled on the five staging Assets."""
 from __future__ import annotations
 
 import logging

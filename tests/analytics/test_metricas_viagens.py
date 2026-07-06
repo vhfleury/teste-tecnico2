@@ -1,16 +1,4 @@
-"""Dedicated tests for the aggregated trip metric tables.
-
-One parametrized golden test per entry in ``METRIC_TABLES``: the input
-fixture — one key per table consumed (enriched trips, geofence
-positions, staging vehicles) — runs through `build_metric` and the
-result is compared with the frozen expected output by the table's own
-grain. The parametrization doubles as the coverage guard: a metric
-registered in ``METRIC_TABLES`` without a config or a golden key
-fails here.
-
-The enriched trips key mirrors the viagens_enriquecidas golden, so
-the metric numbers stay coherent with the upstream gold table.
-"""
+"""Dedicated tests for the aggregated trip metric tables."""
 import json
 import os
 
@@ -57,8 +45,7 @@ def build_frames(spark: SparkSession) -> dict:
         spark: Active SparkSession.
 
     Returns:
-        Input DataFrames by name (`trips`, `vehicles`,
-        `geofence_positions`).
+        Input DataFrames by name (`trips`, `vehicles`, `geofence_positions`).
     """
     fixture = load_fixture("input_metricas_viagens.json")
     trips = spark.createDataFrame(fixture["analytics_viagens_enriquecidas"], TRIPS_SCHEMA)
@@ -76,17 +63,12 @@ def build_frames(spark: SparkSession) -> dict:
 def build_result_rows(spark: SparkSession, table_name: str) -> list[dict]:
     """Run one metric build over the input fixture.
 
-    Shared by the golden test and by the manual golden regeneration,
-    so the frozen output is always produced by the exact code path
-    the test exercises.
-
     Args:
         spark: Active SparkSession.
         table_name: Metric dataset name (a `METRIC_TABLES` key).
 
     Returns:
-        The metric rows as JSON-friendly dicts with the runtime
-        columns masked.
+        The metric rows as JSON-friendly dicts with the runtime columns masked.
     """
     return dataframe_to_rows(
         build_metric(table_name, build_frames(spark)), mask=RUNTIME_COLUMNS

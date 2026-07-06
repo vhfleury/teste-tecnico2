@@ -1,41 +1,4 @@
-"""DAG ``geocercas`` - ingestion and quality of the geofence registry.
-
-Flow across the lakehouse layers, partitioned by ingestion date::
-
-    data/geocercas/geocercas.geojson
-      |-(extract_to_raw)->  lakehouse/raw/geocercas/ingest_date=YYYY-MM-DD
-          |-(transform_to_staging)->  lakehouse/staging/geocercas/ingest_date=YYYY-MM-DD
-              |-(data_quality)-> log alert for the rejected records
-
-Only rows with ``quality_ok`` True reach staging; rejected rows are
-discarded — never persisted. The ``data_quality`` task logs the alert
-(count, reasons, percentage over the total) from the transform metrics
-passed via XCom; when the transform is skipped, it skips along.
-
-The DAG is thin on purpose: all PySpark logic lives in
-``pipelines/geocercas/geocercas.py`` and the staging contract
-(columns, treatments, validations, key) in ``staging_geocercas.json``.
-
-Both layers are Delta tables: each run atomically replaces only its own
-``ingest_date`` partition (``replaceWhere``, the run's ``logical_date``).
-Different dates coexist; reprocessing the same date only overwrites that
-partition.
-
-**Idempotency via pre-check:** before doing any work, each task checks
-the partition's processed marker (written under ``_markers/`` after each
-Delta commit). If it exists, the task is skipped
-(``AirflowSkipException``) instead of reprocessing. The transform task uses
-``trigger_rule="none_failed"`` so it can still run its own check even when
-the extraction task was skipped because raw already existed.
-
-Tasks communicate through the persisted layer (the raw Delta table), not
-XCom: each one reads/writes the lakehouse and can be re-run independently.
-The one exception is the ``data_quality`` alert: rejected rows are never
-persisted, so the transform's metrics travel to that task via XCom.
-
-The final task publishes the ``staging_geocercas`` Asset, the data-aware
-trigger for the future gold DAG (geospatial enrichment + trip fact table).
-"""
+"""DAG ``geocercas`` - ingests the geofence registry from GeoJSON to raw to staging, with a data-quality alert."""
 from __future__ import annotations
 
 import logging

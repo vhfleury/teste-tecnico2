@@ -1,23 +1,4 @@
-"""metricas_viagens analytics: aggregated trip metric tables.
-
-One stage, one task, six Delta tables:
-
-* ``transform_to_analytics`` — reads the enriched trips
-  (analytics_viagens_enriquecidas), the geofence-enriched positions
-  (analytics_posicoes_geocercas) and the staging vehicles — all Delta
-  tables — builds every metric table registered in ``METRIC_TABLES``
-  and writes each one to its own analytics Delta table.
-
-The upstream gold tables already carry the SEMANTICS (joins,
-quarantine, atrasada_flag, mes); this module only aggregates them.
-Each metric lives in its own table with an explicit grain, declared by
-its own config. ``METRIC_TABLES`` is the single registry driving the
-transform, the golden tests and the coverage guard: a metric added
-here without config/fixture fails the parametrized test.
-
-Aggregated grain carries only the ``processed_at`` control column —
-per-row lineage and quality live in analytics_viagens_enriquecidas.
-"""
+"""metricas_viagens analytics: aggregated trip metric tables."""
 from __future__ import annotations
 
 import logging
@@ -54,10 +35,6 @@ DURATION_PRECISION = 2
 def build_trips_by_month_status(trips: DataFrame) -> DataFrame:
     """Count trips per month and per status.
 
-    A null status is kept as its own group (trips whose status was
-    nullified by staging quality); trips without a month (no
-    data_inicio) are excluded.
-
     Args:
         trips: Enriched trips DataFrame.
 
@@ -73,10 +50,6 @@ def build_trips_by_month_status(trips: DataFrame) -> DataFrame:
 
 def build_avg_route_duration(trips: DataFrame) -> DataFrame:
     """Average the actual trip duration per origin -> destination route.
-
-    The average only considers trips with a duration (start and actual
-    end present); ``total_viagens`` counts every trip on the route.
-    Routes missing either geofence id are excluded.
 
     Args:
         trips: Enriched trips DataFrame.
@@ -102,10 +75,6 @@ def build_avg_route_duration(trips: DataFrame) -> DataFrame:
 def build_monthly_delay_rate(trips: DataFrame) -> DataFrame:
     """Compute the monthly delay rate (delayed trips / total trips).
 
-    Delayed means ``atrasada_flag`` (explicit `ATRASADA` status OR
-    actual end after the planned end). Trips without a month are
-    excluded.
-
     Args:
         trips: Enriched trips DataFrame.
 
@@ -128,9 +97,6 @@ def build_monthly_delay_rate(trips: DataFrame) -> DataFrame:
 
 def build_top_drivers(trips: DataFrame) -> DataFrame:
     """Rank the top drivers by completed trips.
-
-    Ties break deterministically by ``motorista_id`` ascending; trips
-    without a driver id are excluded.
 
     Args:
         trips: Enriched trips DataFrame.
@@ -161,12 +127,6 @@ def build_top_drivers(trips: DataFrame) -> DataFrame:
 
 def build_monthly_fleet_utilization(trips: DataFrame, vehicles: DataFrame) -> DataFrame:
     """Compute the monthly active-fleet utilization rate.
-
-    Numerator: distinct vehicles with trips in the month, restricted
-    (semi join) to the active fleet so orphan/inactive vehicles never
-    push the rate above 1. Denominator: total active vehicles in the
-    staging snapshot. Months with trips but no active-fleet vehicle
-    keep a row with utilization 0.
 
     Args:
         trips: Enriched trips DataFrame.
@@ -205,13 +165,6 @@ def build_monthly_fleet_utilization(trips: DataFrame, vehicles: DataFrame) -> Da
 
 def build_geofence_dwell_time(geofence_positions: DataFrame) -> DataFrame:
     """Average the dwell time inside geofences per geofence type.
-
-    A visit is a consecutive run of positions inside the same geofence
-    along a trip: the entry events already flagged by
-    analytics_posicoes_geocercas split the in-geofence positions into
-    visits (a cumulative sum of entries per trip). The visit duration
-    is last - first position timestamp, so a single-position visit
-    counts as 0 minutes.
 
     Args:
         geofence_positions: analytics_posicoes_geocercas DataFrame.
@@ -302,9 +255,6 @@ def table_config_path(name: str) -> str:
 def build_metric(name: str, frames: dict[str, DataFrame]) -> DataFrame:
     """Build one metric table and enforce its declared contract.
 
-    Pure DataFrame -> DataFrame transformation, kept separate from
-    I/O so it can be tested with synthetic data.
-
     Args:
         name: Metric dataset name (a `METRIC_TABLES` key).
         frames: Input DataFrames by name (`trips`, `vehicles`,
@@ -334,10 +284,6 @@ def build_all_metrics(frames: dict[str, DataFrame]) -> dict[str, DataFrame]:
 
 def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     """Read the gold/staging inputs, build and write every metric table.
-
-    Each output is a Delta table: the write atomically replaces only
-    this `ingest_date` partition and the marker is set right after
-    each commit (Delta writes no `_SUCCESS` file).
 
     Args:
         spark: Active SparkSession (must be created with

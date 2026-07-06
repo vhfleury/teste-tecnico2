@@ -1,13 +1,4 @@
-"""Data-quality split and reporting helpers shared by every pipeline.
-
-The staging engine splits validated rows by their ``quality_ok`` flag:
-only approved rows reach the staging layer, rejected rows are DISCARDED
-(never persisted). This module owns that split and the log alert the
-transform emits while the rejected DataFrame is still in hand: how many
-records were rejected, why, and their share of the total — the alert is
-the only trace the rejected rows leave. Nothing here ever changes
-values.
-"""
+"""Data-quality split and reporting helpers shared by every pipeline."""
 from __future__ import annotations
 
 import logging
@@ -35,10 +26,7 @@ def split_by_quality(df: DataFrame) -> tuple[DataFrame, DataFrame]:
 
 
 def summarize_rejections(rejected: DataFrame) -> list[tuple[str, int]]:
-    """Count rejected rows per ``dq_observations`` reason.
-
-    A row rejected for more than one reason (``;``-separated) counts
-    once per reason.
+    """Count rejected rows per ``dq_observations`` reason (once per reason).
 
     Args:
         rejected: DataFrame with the quarantined rows.
@@ -62,11 +50,6 @@ def summarize_rejections(rejected: DataFrame) -> list[tuple[str, int]]:
 def rejection_metrics(rejected: DataFrame, approved_count: int) -> dict:
     """Measure a partition's rejected rows before they are discarded.
 
-    Called by the staging transform while the rejected DataFrame is
-    still in hand: rejected rows are never persisted, so these metrics
-    (surfaced by the DAG's ``data_quality`` task) are the only trace
-    they leave.
-
     Args:
         rejected: DataFrame with the rows about to be discarded.
         approved_count: Number of rows written to staging, used to
@@ -89,11 +72,6 @@ def rejection_metrics(rejected: DataFrame, approved_count: int) -> dict:
 
 def log_rejection_alert(metrics: dict) -> None:
     """Log the data-quality alert from a staging transform's metrics.
-
-    Backs the ``data_quality`` DAG task: rejected rows are never
-    persisted, so there is no table to read — the transform hands its
-    metrics over (XCom) and this alert reports the rejected count, the
-    count per reason and the percentages over the partition total.
 
     Args:
         metrics: Transform metrics with ``source``, ``ingest_date``,

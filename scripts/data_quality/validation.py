@@ -1,10 +1,4 @@
-"""Generic validation helpers shared by every pipeline.
-
-Validations never mutate valid values: they flag rows
-(`apply_table_validations` / `apply_quarantine`) or abort the pipeline
-when the data drifts from its table config (`enforce_table_config`).
-Value-changing logic lives in ``parser/treatment.py``.
-"""
+"""Generic validation helpers shared by every pipeline."""
 from __future__ import annotations
 
 from data_quality.statics import (
@@ -39,11 +33,7 @@ def required(column: Column) -> Column:
 
 
 def plate_is_valid(column: Column) -> Column:
-    """Validate a Brazilian license plate.
-
-    Accepts the old format (`ABC1234`) and the Mercosul format
-    (`ABC1D23`). The value is expected to be already trimmed and
-    uppercased by the treatments.
+    """Validate a Brazilian license plate (old `ABC1234` or Mercosul `ABC1D23`).
 
     Args:
         column: String column with the plate to check.
@@ -56,9 +46,6 @@ def plate_is_valid(column: Column) -> Column:
 
 def coordinates_are_in_brazil(latitude: Column, longitude: Column) -> Column:
     """Validate a GPS coordinate pair against broad Brazil bounds.
-
-    The zeroed ``(0, 0)`` sentinel is intentionally left to the
-    dedicated ``non_zero`` checks so the reason remains precise.
 
     Args:
         latitude: Latitude column.
@@ -85,11 +72,6 @@ GEOJSON_POLYGON_SCHEMA = "type string, coordinates array<array<array<double>>>"
 def _polygon_checks(column: Column) -> tuple[Column, Column, Column]:
     """Build the expressions shared by the GeoJSON Polygon checks.
 
-    Single definition of what a structurally valid polygon is, shared
-    by `geojson_polygon_is_valid` and `geojson_polygon_is_in_brazil`.
-    The expressions are not null-safe: an unparseable geometry yields
-    null, and each caller decides how nulls count for its concern.
-
     Args:
         column: String column holding the GeoJSON geometry.
 
@@ -115,12 +97,6 @@ def _polygon_checks(column: Column) -> tuple[Column, Column, Column]:
 def geojson_polygon_is_valid(column: Column) -> Column:
     """Validate a GeoJSON Polygon serialized as a JSON string.
 
-    Structural check on the outer ring: the value must parse as a
-    ``Polygon`` whose ring has at least 4 points and contains no
-    zeroed ``(0, 0)`` coordinate (the "null island" defect). A null
-    geometry passes, so presence can be flagged separately by
-    ``required`` under its own reason.
-
     Args:
         column: String column holding the GeoJSON geometry.
 
@@ -134,11 +110,6 @@ def geojson_polygon_is_valid(column: Column) -> Column:
 
 def geojson_polygon_is_in_brazil(column: Column) -> Column:
     """Validate that a GeoJSON Polygon's outer ring is inside Brazil bounds.
-
-    This check only owns the geographic-bounds concern. Null,
-    unparseable, non-Polygon, degenerate or zeroed geometries pass here
-    so `required` and `geojson_polygon_is_valid` can record the precise
-    structural reason.
 
     Args:
         column: String column holding the GeoJSON geometry.
@@ -200,10 +171,6 @@ VALIDATIONS = {
 
 def apply_quarantine(df: DataFrame, checks: dict[str, Column]) -> DataFrame:
     """Flag rows that fail data-quality checks without dropping them.
-
-    Failing rows keep their primary key so joins with other tables
-    still work; the reason is recorded in `dq_observations` and the
-    overall row status in `quality_ok`.
 
     Args:
         df: DataFrame to validate.
@@ -304,24 +271,6 @@ def _resolve_unique_checks(
 ) -> tuple[DataFrame, dict[str, Column], dict[str, list[Column]], list[str]]:
     """Materialize each ``unique`` validation into a reusable flag column.
 
-    Uniqueness is windowed - it depends on the other rows - so it is
-    computed once into a helper column and handed back as a plain
-    boolean condition (True when the row is the first for its value),
-    exactly like the per-value checks. That lets the caller build
-    `dq_observations` and null the failing values in a single place
-    instead of a second quarantine pass, and the single materialized
-    column keeps the flag and the null on the same physical row (two
-    separate window passes could disagree on which row is the first).
-
-    Two details make it safe on a non-key column (e.g. a duplicate
-    invoice number, not just the primary key):
-
-    * Null and empty are not duplicates of each other (SQL ``UNIQUE``
-      semantics) - a missing value is `required`'s concern, never a
-      duplicate.
-    * The kept row is the one first by primary key, a deterministic
-      tie-break, so which duplicate is flagged never varies between runs.
-
     Args:
         df: DataFrame already standardized by the treatments.
         config: Parsed table config; a ``unique`` validation names the
@@ -370,18 +319,6 @@ def _resolve_unique_checks(
 def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
     """Run the validations declared in the table config (quarantine).
 
-    Each ``schema`` entry may declare ``validations``: a list of
-    ``{"check", "reason"}`` pairs, where ``check`` is a key of
-    ``VALIDATIONS`` and ``reason`` is the label recorded in
-    `dq_observations`. Every check is wrapped null-safely (a null
-    boolean counts as invalid). The ``unique`` check is windowed, so
-    `_resolve_unique_checks` materializes it into a flag column first;
-    every reason - per-value and unique - then flows through the same
-    `apply_quarantine` (one place builds `dq_observations`/`quality_ok`)
-    and the same `_null_failing_values`. Failing rows are flagged, never
-    dropped, and the failing value is nulled out - the row keeps its
-    primary key so joins still work.
-
     Args:
         df: DataFrame already standardized by the treatments.
         config: Parsed table config with `schema` entries that may
@@ -409,14 +346,6 @@ def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
 
 def enforce_table_config(df: DataFrame, config: dict) -> DataFrame:
     """Validate a DataFrame against a table config and order its columns.
-
-    The config is the table's contract: every non-partition column
-    declared in ``schema`` must be present with the declared type,
-    otherwise the pipeline fails instead of writing a table that
-    drifted from its config. Partition columns (``partitioned_by``)
-    are not required in the DataFrame - they only materialize in the
-    path when the partition is written. Columns not declared in the
-    config are dropped.
 
     Args:
         df: DataFrame about to be written to the table.
