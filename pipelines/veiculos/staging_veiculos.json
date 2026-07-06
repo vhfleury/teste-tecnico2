@@ -8,6 +8,9 @@
             "type": "string",
             "key": true,
             "treatments": ["normalize"],
+            "validations": [
+                {"check": "unique", "reason": "duplicate_key"}
+            ],
             "example": "VEI-0001"
         },
         {

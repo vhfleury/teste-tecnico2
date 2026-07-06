@@ -41,6 +41,20 @@
             "status": "ativo",
             "source_file": "/opt/airflow/data/motoristas/motoristas.json",
             "ingested_at": "2026-07-02 12:00:00.000000"
+        },
+        {
+            "motorista_id": "MOT-0002",
+            "nome": "Nicolas Sousa",
+            "cpf": "795.426.108-58",
+            "cnh": "95800408566",
+            "categoria_cnh": "E",
+            "validade_cnh": "2027-10-10",
+            "telefone": "81 0878 5042",
+            "data_admissao": "2023-11-03",
+            "base_operacional": "CD Recife - Jaboatão",
+            "status": "ativo",
+            "source_file": "/opt/airflow/data/motoristas/motoristas.json",
+            "ingested_at": "2026-07-02 12:00:00.000000"
         }
     ]
 }

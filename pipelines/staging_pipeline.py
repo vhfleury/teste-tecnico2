@@ -273,7 +273,7 @@ def run_staging_transform(
 
     dropped = total_in - total_out - rejected_count
     if dropped:
-        log.info("%d record(s) dropped for %s (missing key or duplicate)", dropped, source)
+        log.info("%d record(s) dropped for %s (missing key)", dropped, source)
 
     log.info(
         "Transform finished for %s - %d in staging, %d rejected and discarded",

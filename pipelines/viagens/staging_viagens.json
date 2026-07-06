@@ -8,6 +8,9 @@
             "type": "string",
             "key": true,
             "treatments": ["normalize"],
+            "validations": [
+                {"check": "unique", "reason": "duplicate_key"}
+            ],
             "example": "VIA-000001"
         },
         {
@@ -73,7 +76,7 @@
             "name": "peso_carga_kg",
             "type": "int",
             "validations": [
-                {"check": "positive", "reason": "invalid_cargo_weight"}
+                {"check": "non_negative", "reason": "negative_cargo_weight"}
             ],
             "example": 29358
         },
@@ -82,7 +85,8 @@
             "type": "string",
             "treatments": ["normalize"],
             "validations": [
-                {"check": "required", "reason": "missing_invoice"}
+                {"check": "required", "reason": "missing_invoice"},
+                {"check": "unique", "reason": "duplicate_invoice"}
             ],
             "example": "NF-577810"
         },

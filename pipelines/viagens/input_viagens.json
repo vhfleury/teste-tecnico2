@@ -47,6 +47,54 @@
             "nota_fiscal": "NF-604633",
             "source_file": "/opt/airflow/data/viagens/viagens.csv",
             "ingested_at": "2026-07-04 12:00:00.000000"
+        },
+        {
+            "viagem_id": "VIA-000017",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0001",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "data_inicio": "2026-04-28 08:00:00.000000",
+            "data_fim_prevista": "2026-04-28 18:00:00.000000",
+            "data_fim_real": "2026-04-28 17:00:00.000000",
+            "status": "concluida",
+            "distancia_km": "500",
+            "peso_carga_kg": "0",
+            "nota_fiscal": "NF-700017",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00.000000"
+        },
+        {
+            "viagem_id": "VIA-000018",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0002",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "data_inicio": "2026-04-28 09:00:00.000000",
+            "data_fim_prevista": "2026-04-28 19:00:00.000000",
+            "data_fim_real": "2026-04-28 18:00:00.000000",
+            "status": "concluida",
+            "distancia_km": "600",
+            "peso_carga_kg": "8000",
+            "nota_fiscal": "NF-577810",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00.000000"
+        },
+        {
+            "viagem_id": "VIA-000019",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-0003",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "data_inicio": "2026-04-28 10:00:00.000000",
+            "data_fim_prevista": "2026-04-28 20:00:00.000000",
+            "data_fim_real": "2026-04-28 19:00:00.000000",
+            "status": "concluida",
+            "distancia_km": "700",
+            "peso_carga_kg": "-500",
+            "nota_fiscal": "NF-700019",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00.000000"
         }
     ]
 }

@@ -158,9 +158,10 @@ def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
     Pure DataFrame -> DataFrame transformation, kept separate from
     I/O so it can be unit-tested with synthetic data. The GeoJSON
     flattening is the only source-exclusive step; every other rule
-    lives in the table config: treatments/cast/dedup first, then the
-    quarantine validations (invalid values are nulled but the row
-    keeps its primary key), and finally the derived columns.
+    lives in the table config: treatments/cast and the keyless-row
+    drop first, then the quarantine validations (invalid values are
+    nulled but the row keeps its primary key; duplicate keys are
+    flagged by the ``unique`` check), and finally the derived columns.
 
     Args:
         raw: Raw geofence DataFrame, as read from the raw layer.

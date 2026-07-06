@@ -50,6 +50,23 @@
             "dq_observations": "invalid_cnh",
             "quality_ok": false,
             "processed_at": null
+        },
+        {
+            "motorista_id": null,
+            "nome": "NICOLAS SOUSA",
+            "cpf": "795.426.108-58",
+            "cpf_normalize": "79542610858",
+            "cnh": "95800408566",
+            "categoria_cnh": "E",
+            "validade_cnh": "2027-10-10",
+            "telefone": "8108785042",
+            "data_admissao": "2023-11-03",
+            "base_operacional": "CD Recife - Jaboatão",
+            "status": "ATIVO",
+            "ingested_at": "2026-07-02 12:00:00",
+            "dq_observations": "duplicate_key",
+            "quality_ok": false,
+            "processed_at": null
         }
     ]
 }
