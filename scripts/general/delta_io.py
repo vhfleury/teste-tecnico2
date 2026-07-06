@@ -1,20 +1,4 @@
-"""Delta Lake read/write and idempotency helpers for the lakehouse.
-
-Every lakehouse layer (raw, staging and analytics) is a Delta table
-partitioned by ``ingest_date``, which replaces two plain-Parquet
-conventions:
-
-- Spark does not write a ``_SUCCESS`` marker on Delta commits, so the
-  cheap pre-Spark skip used by the DAGs is a manual marker under
-  ``<base_dir>/_markers/``.
-- Partitions are not addressed by path: writes replace only their own
-  ``ingest_date`` partition atomically via ``replaceWhere`` and reads
-  load the table root filtered by ``ingest_date``.
-
-Idempotency does not depend on the marker: a stale or missing marker
-can never corrupt the table because every write only replaces its own
-partition.
-"""
+"""Delta Lake read/write and idempotency helpers for the lakehouse."""
 from __future__ import annotations
 
 import logging
@@ -30,11 +14,6 @@ MARKERS_DIR = "_markers"
 
 def write_delta_partition(df: DataFrame, base_dir: str, ingest_date: str) -> None:
     """Atomically overwrite one ``ingest_date`` partition of a Delta table.
-
-    The partition column is added here, at write time, so callers
-    never carry it in their DataFrames (tables with a config contract
-    drop it in `enforce_table_config`; `read_delta_partition` drops it
-    on read).
 
     Args:
         df: DataFrame with the partition's rows, without the
@@ -58,10 +37,6 @@ def write_delta_partition(df: DataFrame, base_dir: str, ingest_date: str) -> Non
 def read_delta_partition(spark: SparkSession, base_dir: str, ingest_date: str) -> DataFrame:
     """Read one ``ingest_date`` partition of a Delta table.
 
-    The partition column is dropped from the result so callers see the
-    same shape a single-partition path read used to give them;
-    `write_delta_partition` re-adds the column at write time.
-
     Args:
         spark: Active SparkSession (must be created with
             ``enable_delta=True``).
@@ -82,9 +57,6 @@ def read_delta_partition(spark: SparkSession, base_dir: str, ingest_date: str) -
 
 def _marker_path(base_dir: str, ingest_date: str) -> str:
     """Build the processed-marker path for a Delta partition.
-
-    The marker lives in an underscore-prefixed directory so Delta and
-    Spark readers ignore it (like ``_delta_log``).
 
     Args:
         base_dir: Base directory of the Delta table.

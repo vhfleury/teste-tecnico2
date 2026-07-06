@@ -7,13 +7,16 @@
             "name": "posicao_id",
             "type": "string",
             "key": true,
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
+            "validations": [
+                {"check": "unique", "reason": "duplicate_key"}
+            ],
             "example": "POS-367FE6FF0F"
         },
         {
             "name": "viagem_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "required", "reason": "missing_trip_id"}
             ],
@@ -22,7 +25,7 @@
         {
             "name": "veiculo_id",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "required", "reason": "missing_vehicle_id"}
             ],
@@ -52,6 +55,7 @@
         {
             "name": "timestamp",
             "type": "timestamp",
+            "treatments": ["parse_date"],
             "validations": [
                 {"check": "required", "reason": "missing_timestamp"}
             ],

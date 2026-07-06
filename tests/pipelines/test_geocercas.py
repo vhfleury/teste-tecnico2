@@ -1,10 +1,4 @@
-"""Dedicated tests for the geocercas exclusive treatment.
-
-The golden test already runs the full chain over the input fixture;
-these cover only `flatten_features`, the source-exclusive step: the
-canonical geometry serialization and the defensive branch for fields
-absent from a whole partition (not reachable through the fixture).
-"""
+"""Dedicated tests for the geocercas exclusive treatment."""
 from geocercas.geocercas import flatten_features
 
 RAW_SCHEMA = (

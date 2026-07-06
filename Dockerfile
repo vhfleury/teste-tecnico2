@@ -8,8 +8,9 @@ ARG PYTHON_VERSION
 
 USER root
 
+# procps provides `ps`, called by pyspark's load-spark-env.sh on session startup.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openjdk-17-jre-headless \
+    && apt-get install -y --no-install-recommends openjdk-17-jre-headless procps \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -20,6 +21,15 @@ USER airflow
 
 COPY requirements.txt /requirements.txt
 RUN pip install --no-cache-dir -r /requirements.txt
+
+# Spark log4j2 config baked into pyspark's conf/ (like the jars below): with a
+# custom config Spark skips the default-profile banner and the expected
+# native-hadoop warning. Spark logs to stderr and Airflow labels every task
+# stderr line as ERROR, so anything below WARN is noise in the task log.
+COPY --chown=airflow:0 docker/spark-log4j2.properties /tmp/spark-log4j2.properties
+RUN PYSPARK_CONF="$(python -c 'import os, pyspark; print(os.path.join(os.path.dirname(pyspark.__file__), "conf"))')" \
+    && mkdir -p "${PYSPARK_CONF}" \
+    && mv /tmp/spark-log4j2.properties "${PYSPARK_CONF}/log4j2.properties"
 
 # Delta Lake jars are baked into pyspark's jars/ at build time so gold-layer
 # sessions never download dependencies at runtime (no Ivy resolution per task).

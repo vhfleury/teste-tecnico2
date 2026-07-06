@@ -1,0 +1,89 @@
+{
+    "analytics_viagens_enriquecidas": [
+        {
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0001",
+            "motorista_nome": "CARLOS SILVA",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "origem_nome": "CD Sao Paulo - Guarulhos",
+            "destino_nome": "Cliente Rio de Janeiro - Centro",
+            "status": "CONCLUIDA",
+            "duracao_horas": 10.5,
+            "atrasada_flag": false,
+            "mes": "2026-04"
+        },
+        {
+            "viagem_id": "VIA-000002",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0002",
+            "motorista_nome": "ANA LIMA",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0001",
+            "origem_nome": "Cliente Rio de Janeiro - Centro",
+            "destino_nome": "CD Sao Paulo - Guarulhos",
+            "status": "CONCLUIDA",
+            "duracao_horas": 18.25,
+            "atrasada_flag": true,
+            "mes": "2026-04"
+        },
+        {
+            "viagem_id": "VIA-000012",
+            "veiculo_id": "VEI-0003",
+            "motorista_id": "MOT-0001",
+            "motorista_nome": "CARLOS SILVA",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "origem_nome": "CD Sao Paulo - Guarulhos",
+            "destino_nome": "Cliente Rio de Janeiro - Centro",
+            "status": "CONCLUIDA",
+            "duracao_horas": 11.5,
+            "atrasada_flag": false,
+            "mes": "2026-06"
+        }
+    ],
+    "analytics_posicoes_geocercas": [
+        {
+            "posicao_id": "PGE-0001",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 08:10:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "CENTRO_DISTRIBUICAO"
+        },
+        {
+            "posicao_id": "PGE-0002",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 08:40:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": false,
+            "geocerca_tipo": "CENTRO_DISTRIBUICAO"
+        },
+        {
+            "posicao_id": "PGE-0004",
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "timestamp": "2026-04-01 17:00:00",
+            "classificacao_localizacao": "em_geocerca",
+            "evento_entrada_geocerca": true,
+            "geocerca_tipo": "CLIENTE"
+        }
+    ],
+    "staging_veiculos": [
+        {
+            "veiculo_id": "VEI-0001",
+            "status": "ATIVO"
+        },
+        {
+            "veiculo_id": "VEI-0002",
+            "status": "EM_MANUTENCAO"
+        },
+        {
+            "veiculo_id": "VEI-0003",
+            "status": "ATIVO"
+        }
+    ]
+}

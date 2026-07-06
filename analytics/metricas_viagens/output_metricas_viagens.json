@@ -1,0 +1,98 @@
+{
+    "analytics_taxa_atraso_mensal": [
+        {
+            "mes": "2026-04",
+            "viagens_atrasadas": 1,
+            "viagens_total": 2,
+            "taxa_atraso": 0.5,
+            "processed_at": null
+        },
+        {
+            "mes": "2026-06",
+            "viagens_atrasadas": 0,
+            "viagens_total": 1,
+            "taxa_atraso": 0.0,
+            "processed_at": null
+        }
+    ],
+    "analytics_tempo_medio_por_rota": [
+        {
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "origem_nome": "CD Sao Paulo - Guarulhos",
+            "destino_nome": "Cliente Rio de Janeiro - Centro",
+            "tempo_medio_horas": 11.0,
+            "total_viagens": 2,
+            "processed_at": null
+        },
+        {
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0001",
+            "origem_nome": "Cliente Rio de Janeiro - Centro",
+            "destino_nome": "CD Sao Paulo - Guarulhos",
+            "tempo_medio_horas": 18.25,
+            "total_viagens": 1,
+            "processed_at": null
+        }
+    ],
+    "analytics_tempo_parado_geocercas": [
+        {
+            "geocerca_tipo": "CENTRO_DISTRIBUICAO",
+            "total_visitas": 1,
+            "tempo_medio_parado_minutos": 30.0,
+            "processed_at": null
+        },
+        {
+            "geocerca_tipo": "CLIENTE",
+            "total_visitas": 1,
+            "tempo_medio_parado_minutos": 0.0,
+            "processed_at": null
+        }
+    ],
+    "analytics_top_motoristas": [
+        {
+            "posicao_rank": 1,
+            "motorista_id": "MOT-0001",
+            "motorista_nome": "CARLOS SILVA",
+            "viagens_concluidas": 2,
+            "processed_at": null
+        },
+        {
+            "posicao_rank": 2,
+            "motorista_id": "MOT-0002",
+            "motorista_nome": "ANA LIMA",
+            "viagens_concluidas": 1,
+            "processed_at": null
+        }
+    ],
+    "analytics_utilizacao_frota_mensal": [
+        {
+            "mes": "2026-04",
+            "veiculos_com_viagem": 1,
+            "veiculos_ativos_total": 2,
+            "taxa_utilizacao": 0.5,
+            "processed_at": null
+        },
+        {
+            "mes": "2026-06",
+            "veiculos_com_viagem": 1,
+            "veiculos_ativos_total": 2,
+            "taxa_utilizacao": 0.5,
+            "processed_at": null
+        }
+    ],
+    "analytics_viagens_por_mes_status": [
+        {
+            "mes": "2026-04",
+            "status": "CONCLUIDA",
+            "total_viagens": 2,
+            "processed_at": null
+        },
+        {
+            "mes": "2026-06",
+            "status": "CONCLUIDA",
+            "total_viagens": 1,
+            "processed_at": null
+        }
+    ]
+}

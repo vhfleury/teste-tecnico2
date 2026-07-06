@@ -14,19 +14,6 @@
             "quality_ok": true
         },
         {
-            "posicao_id": "POS-002",
-            "viagem_id": "VIA-001",
-            "veiculo_id": "VEI-001",
-            "timestamp": "2026-04-28 10:05:00",
-            "latitude": -23.59,
-            "longitude": -46.6,
-            "velocidade_kmh": 35,
-            "source_file": "/opt/airflow/data/rastreamento/posicoes.parquet",
-            "ingested_at": "2026-07-04 12:00:00",
-            "dq_observations": "",
-            "quality_ok": true
-        },
-        {
             "posicao_id": "POS-003",
             "viagem_id": "VIA-001",
             "veiculo_id": "VEI-001",
@@ -34,19 +21,6 @@
             "latitude": -23.57,
             "longitude": -46.62,
             "velocidade_kmh": 48,
-            "source_file": "/opt/airflow/data/rastreamento/posicoes.parquet",
-            "ingested_at": "2026-07-04 12:00:00",
-            "dq_observations": "",
-            "quality_ok": true
-        },
-        {
-            "posicao_id": "POS-004",
-            "viagem_id": "VIA-001",
-            "veiculo_id": "VEI-001",
-            "timestamp": "2026-04-28 10:15:00",
-            "latitude": -23.57,
-            "longitude": -46.62,
-            "velocidade_kmh": 52,
             "source_file": "/opt/airflow/data/rastreamento/posicoes.parquet",
             "ingested_at": "2026-07-04 12:00:00",
             "dq_observations": "",
@@ -70,7 +44,7 @@
         {
             "geocerca_id": "GEO-A",
             "nome": "Terminal A",
-            "tipo": "centro_distribuicao",
+            "tipo": "CENTRO_DISTRIBUICAO",
             "uf": "SP",
             "raio_km": 1.0,
             "ativo": true,
@@ -83,7 +57,7 @@
         {
             "geocerca_id": "GEO-B",
             "nome": "Cliente B",
-            "tipo": "cliente",
+            "tipo": "CLIENTE",
             "uf": "SP",
             "raio_km": 0.5,
             "ativo": true,

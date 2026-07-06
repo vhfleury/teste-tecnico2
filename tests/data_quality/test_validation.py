@@ -278,11 +278,11 @@ def test_apply_table_validations_geofence_type_check(spark):
     }
     df = spark.createDataFrame(
         [
-            ("GEO-0001", "centro_distribuicao"),
-            ("GEO-0002", "pedagio"),
-            ("GEO-0003", "posto_combustivel"),
-            ("GEO-0004", "cliente"),
-            ("GEO-0005", "garagem"),
+            ("GEO-0001", "CENTRO_DISTRIBUICAO"),
+            ("GEO-0002", "PEDAGIO"),
+            ("GEO-0003", "POSTO_COMBUSTIVEL"),
+            ("GEO-0004", "CLIENTE"),
+            ("GEO-0005", "GARAGEM"),
         ],
         ["geocerca_id", "tipo"],
     )
@@ -292,10 +292,10 @@ def test_apply_table_validations_geofence_type_check(spark):
     assert [
         (row["geocerca_id"], row["tipo"], row["quality_ok"]) for row in result
     ] == [
-        ("GEO-0001", "centro_distribuicao", True),
-        ("GEO-0002", "pedagio", True),
-        ("GEO-0003", "posto_combustivel", True),
-        ("GEO-0004", "cliente", True),
+        ("GEO-0001", "CENTRO_DISTRIBUICAO", True),
+        ("GEO-0002", "PEDAGIO", True),
+        ("GEO-0003", "POSTO_COMBUSTIVEL", True),
+        ("GEO-0004", "CLIENTE", True),
         ("GEO-0005", None, False),
     ]
 
@@ -315,11 +315,11 @@ def test_apply_table_validations_trip_status_check(spark):
     }
     df = spark.createDataFrame(
         [
-            ("VIA-000001", "em_transito"),
-            ("VIA-000002", "concluida"),
-            ("VIA-000003", "cancelada"),
-            ("VIA-000004", "atrasada"),
-            ("VIA-000005", "planejada"),
+            ("VIA-000001", "EM_TRANSITO"),
+            ("VIA-000002", "CONCLUIDA"),
+            ("VIA-000003", "CANCELADA"),
+            ("VIA-000004", "ATRASADA"),
+            ("VIA-000005", "PLANEJADA"),
             ("VIA-000006", None),
         ],
         "viagem_id string, status string",
@@ -331,12 +331,161 @@ def test_apply_table_validations_trip_status_check(spark):
     assert [
         (row["viagem_id"], row["status"], row["quality_ok"]) for row in result
     ] == [
-        ("VIA-000001", "em_transito", True),
-        ("VIA-000002", "concluida", True),
-        ("VIA-000003", "cancelada", True),
-        ("VIA-000004", "atrasada", True),
+        ("VIA-000001", "EM_TRANSITO", True),
+        ("VIA-000002", "CONCLUIDA", True),
+        ("VIA-000003", "CANCELADA", True),
+        ("VIA-000004", "ATRASADA", True),
         ("VIA-000005", None, False),
         ("VIA-000006", None, False),
+    ]
+
+
+def test_apply_table_validations_speed_within_limit_flags_above_ceiling(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "velocidade_kmh",
+                "type": "int",
+                "validations": [
+                    {"check": "speed_within_limit", "reason": "speed_above_limit"}
+                ],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [("POS-1", 41), ("POS-2", 150), ("POS-3", 151), ("POS-4", 999), ("POS-5", None)],
+        "posicao_id string, velocidade_kmh int",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # 150 km/h is the inclusive ceiling; above it the reading is a device
+    # sentinel and is nulled/flagged. A null speed is invalid under the
+    # null-safe wrapping too.
+    assert [
+        (row["posicao_id"], row["velocidade_kmh"], row["dq_observations"], row["quality_ok"])
+        for row in result
+    ] == [
+        ("POS-1", 41, "", True),
+        ("POS-2", 150, "", True),
+        ("POS-3", None, "speed_above_limit", False),
+        ("POS-4", None, "speed_above_limit", False),
+        ("POS-5", None, "speed_above_limit", False),
+    ]
+
+
+def test_apply_table_validations_driver_status_check(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "status",
+                "type": "string",
+                "validations": [
+                    {"check": "driver_status_is_valid", "reason": "invalid_status"}
+                ],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("MOT-0001", "ATIVO"),
+            ("MOT-0002", "FERIAS"),
+            ("MOT-0003", "AFASTADO"),
+            ("MOT-0004", "DESLIGADO"),
+            ("MOT-0005", "APOSENTADO"),
+            ("MOT-0006", None),
+        ],
+        "motorista_id string, status string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # The four known statuses pass; an unknown or null status is flagged.
+    assert [
+        (row["motorista_id"], row["status"], row["quality_ok"]) for row in result
+    ] == [
+        ("MOT-0001", "ATIVO", True),
+        ("MOT-0002", "FERIAS", True),
+        ("MOT-0003", "AFASTADO", True),
+        ("MOT-0004", "DESLIGADO", True),
+        ("MOT-0005", None, False),
+        ("MOT-0006", None, False),
+    ]
+
+
+def test_apply_table_validations_vehicle_status_check(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "status",
+                "type": "string",
+                "validations": [
+                    {"check": "vehicle_status_is_valid", "reason": "invalid_status"}
+                ],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("VEI-0001", "ATIVO"),
+            ("VEI-0002", "EM_MANUTENCAO"),
+            ("VEI-0003", "INATIVO"),
+            ("VEI-0004", "VENDIDO"),
+            ("VEI-0005", None),
+        ],
+        "veiculo_id string, status string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    assert [
+        (row["veiculo_id"], row["status"], row["quality_ok"]) for row in result
+    ] == [
+        ("VEI-0001", "ATIVO", True),
+        ("VEI-0002", "EM_MANUTENCAO", True),
+        ("VEI-0003", "INATIVO", True),
+        ("VEI-0004", None, False),
+        ("VEI-0005", None, False),
+    ]
+
+
+def test_apply_table_validations_vehicle_type_check(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "tipo",
+                "type": "string",
+                "validations": [
+                    {"check": "vehicle_type_is_valid", "reason": "invalid_vehicle_type"}
+                ],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("VEI-0001", "VUC"),
+            ("VEI-0002", "Caminhão Toco"),
+            ("VEI-0003", "Bitrem"),
+            ("VEI-0004", "Motocicleta"),
+            ("VEI-0005", None),
+        ],
+        ["veiculo_id", "tipo"],
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    assert [
+        (row["veiculo_id"], row["tipo"], row["quality_ok"]) for row in result
+    ] == [
+        ("VEI-0001", "VUC", True),
+        ("VEI-0002", "Caminhão Toco", True),
+        ("VEI-0003", "Bitrem", True),
+        ("VEI-0004", None, False),
+        ("VEI-0005", None, False),
     ]
 
 
@@ -432,6 +581,77 @@ def test_apply_table_validations_geojson_polygon_brazil_bounds_check(spark):
         ("GEO-0003", None, "invalid_geometry", False),
         ("GEO-0004", None, "invalid_geometry", False),
     ]
+
+
+def test_apply_table_validations_unique_flags_duplicate_keys(spark):
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {
+                "name": "motorista_id",
+                "type": "string",
+                "key": True,
+                "validations": [{"check": "unique", "reason": "duplicate_key"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [("MOT-0001",), ("MOT-0002",), ("MOT-0002",)],
+        "motorista_id string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    # The first row of each key passes; the extra MOT-0002 is flagged and
+    # its key nulled, so it is rejected and counted in the alert instead
+    # of being dropped silently.
+    flags = {
+        (row["motorista_id"], row["dq_observations"], row["quality_ok"]) for row in result
+    }
+    assert flags == {
+        ("MOT-0001", "", True),
+        ("MOT-0002", "", True),
+        (None, "duplicate_key", False),
+    }
+
+
+def test_apply_table_validations_unique_on_non_key_column_ignores_nulls(spark):
+    # Uniqueness also guards a non-key column (a duplicate invoice): nulls
+    # are distinct (never flagged), and the kept row is the first by
+    # primary key so the flagged duplicate is deterministic.
+    config = {
+        "table_name": "staging_example",
+        "schema": [
+            {"name": "viagem_id", "type": "string", "key": True},
+            {
+                "name": "nota_fiscal",
+                "type": "string",
+                "validations": [{"check": "unique", "reason": "duplicate_invoice"}],
+            },
+        ],
+    }
+    df = spark.createDataFrame(
+        [
+            ("VIA-1", "NF-1"),
+            ("VIA-2", "NF-1"),
+            ("VIA-3", None),
+            ("VIA-4", None),
+        ],
+        "viagem_id string, nota_fiscal string",
+    )
+
+    result = apply_table_validations(df, config).collect()
+
+    flags = {
+        (row["viagem_id"], row["nota_fiscal"], row["dq_observations"], row["quality_ok"])
+        for row in result
+    }
+    assert flags == {
+        ("VIA-1", "NF-1", "", True),
+        ("VIA-2", None, "duplicate_invoice", False),
+        ("VIA-3", None, "", True),
+        ("VIA-4", None, "", True),
+    }
 
 
 def test_apply_table_validations_fails_on_unknown_check(spark):

@@ -1,0 +1,150 @@
+{
+    "staging_viagens": [
+        {
+            "viagem_id": "VIA-000001",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-0001",
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "data_inicio": "2026-04-01 08:00:00",
+            "data_fim_prevista": "2026-04-01 20:00:00",
+            "data_fim_real": "2026-04-01 18:30:00",
+            "status": "CONCLUIDA",
+            "distancia_km": 430,
+            "peso_carga_kg": 12000,
+            "nota_fiscal": "NF-100001",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000002",
+            "veiculo_id": "VEI-0002",
+            "motorista_id": "MOT-0002",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0001",
+            "data_inicio": "2026-04-02 06:00:00",
+            "data_fim_prevista": "2026-04-02 18:00:00",
+            "data_fim_real": "2026-04-03 00:15:00",
+            "status": "CONCLUIDA",
+            "distancia_km": 520,
+            "peso_carga_kg": 18000,
+            "nota_fiscal": "NF-100002",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        },
+        {
+            "viagem_id": "VIA-000006",
+            "veiculo_id": "VEI-9999",
+            "motorista_id": "MOT-0003",
+            "geocerca_origem_id": "GEO-0002",
+            "geocerca_destino_id": "GEO-0003",
+            "data_inicio": "2026-05-08 08:00:00",
+            "data_fim_prevista": "2026-05-08 20:00:00",
+            "data_fim_real": "2026-05-08 19:00:00",
+            "status": "CONCLUIDA",
+            "distancia_km": 410,
+            "peso_carga_kg": 9500,
+            "nota_fiscal": "NF-100006",
+            "source_file": "/opt/airflow/data/viagens/viagens.csv",
+            "ingested_at": "2026-07-04 12:00:00",
+            "dq_observations": "",
+            "quality_ok": true
+        }
+    ],
+    "staging_veiculos": [
+        {
+            "veiculo_id": "VEI-0001",
+            "placa": "ABC1D23",
+            "marca": "VOLVO",
+            "modelo": "VM 270",
+            "tipo": "Carreta LS",
+            "capacidade_kg": 41500,
+            "status": "ATIVO"
+        },
+        {
+            "veiculo_id": "VEI-0002",
+            "placa": "DEF2E45",
+            "marca": "SCANIA",
+            "modelo": "R450",
+            "tipo": "Bitrem",
+            "capacidade_kg": 57000,
+            "status": "EM_MANUTENCAO"
+        },
+        {
+            "veiculo_id": "VEI-0003",
+            "placa": "GHI3F67",
+            "marca": "MERCEDES",
+            "modelo": "ACTROS 2651",
+            "tipo": "VUC",
+            "capacidade_kg": 3500,
+            "status": "ATIVO"
+        }
+    ],
+    "staging_motoristas": [
+        {
+            "motorista_id": "MOT-0001",
+            "nome": "CARLOS SILVA",
+            "categoria_cnh": "E",
+            "base_operacional": "CD Sao Paulo - Guarulhos",
+            "status": "ATIVO"
+        },
+        {
+            "motorista_id": "MOT-0002",
+            "nome": "ANA LIMA",
+            "categoria_cnh": "D",
+            "base_operacional": "CD Recife - Jaboatao",
+            "status": "FERIAS"
+        },
+        {
+            "motorista_id": "MOT-0003",
+            "nome": "JOAO PEREIRA",
+            "categoria_cnh": "C",
+            "base_operacional": "CD Curitiba - CIC",
+            "status": "ATIVO"
+        }
+    ],
+    "staging_geocercas": [
+        {
+            "geocerca_id": "GEO-0001",
+            "nome": "CD Sao Paulo - Guarulhos",
+            "tipo": "CENTRO_DISTRIBUICAO",
+            "uf": "SP"
+        },
+        {
+            "geocerca_id": "GEO-0002",
+            "nome": "Cliente Rio de Janeiro - Centro",
+            "tipo": "CLIENTE",
+            "uf": "RJ"
+        },
+        {
+            "geocerca_id": "GEO-0003",
+            "nome": "Posto BR-116 Registro",
+            "tipo": "POSTO_COMBUSTIVEL",
+            "uf": "SP"
+        }
+    ],
+    "staging_posicoes": [
+        {
+            "posicao_id": "POS-0001",
+            "viagem_id": "VIA-000001",
+            "velocidade_kmh": 40,
+            "timestamp": "2026-04-01 08:10:00"
+        },
+        {
+            "posicao_id": "POS-0004",
+            "viagem_id": "VIA-000002",
+            "velocidade_kmh": 50,
+            "timestamp": "2026-04-02 06:30:00"
+        },
+        {
+            "posicao_id": "POS-0011",
+            "viagem_id": "VIA-000006",
+            "velocidade_kmh": 62,
+            "timestamp": "2026-05-08 12:00:00"
+        }
+    ]
+}

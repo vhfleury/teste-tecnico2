@@ -1,15 +1,4 @@
-"""Dedicated tests for the viagens_enriquecidas analytics table.
-
-Analytics has exclusive treatment (joins and business rules live in
-code, not in the config), so it is not covered by the generic staging
-golden test. The golden test runs the full `build_analytics` chain
-over the input fixture — one key per staging table consumed — and
-compares the result with the frozen expected output, keyed by
-`viagem_id`. The fixture covers every trip status, an implicit delay
-(actual end after the planned end on a `concluida` trip), one orphan
-per dimension, a trip without positions, staging-inherited defects and
-trips spread across three months.
-"""
+"""Dedicated tests for the viagens_enriquecidas analytics table."""
 import json
 import os
 
@@ -17,11 +6,11 @@ from general.utils import load_table_config
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-from analytics.viagens_enriquecidas import build_analytics
+from analytics.viagens_enriquecidas.viagens_enriquecidas import build_analytics
 from tests.pipelines.diff import assert_matches_expected, dataframe_to_rows
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ANALYTICS_ROOT = os.path.join(ROOT, "analytics")
+ANALYTICS_ROOT = os.path.join(ROOT, "analytics", "viagens_enriquecidas")
 
 # Runtime metadata: the column must exist in the output (config is the
 # contract), but its value is generated at execution time, so it is
@@ -60,16 +49,11 @@ def load_fixture(file_name: str) -> dict:
 def build_result_rows(spark: SparkSession) -> list[dict]:
     """Run the full analytics chain over the input fixture.
 
-    Shared by the golden test and by the manual golden regeneration,
-    so the frozen output is always produced by the exact code path
-    the test exercises.
-
     Args:
         spark: Active SparkSession.
 
     Returns:
-        The analytics rows as JSON-friendly dicts with the runtime
-        columns masked.
+        The analytics rows as JSON-friendly dicts with the runtime columns masked.
     """
     fixture = load_fixture("input_viagens_enriquecidas.json")
     trips = spark.createDataFrame(fixture["staging_viagens"], TRIPS_SCHEMA)

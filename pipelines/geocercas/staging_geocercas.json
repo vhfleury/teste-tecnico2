@@ -7,7 +7,10 @@
             "name": "geocerca_id",
             "type": "string",
             "key": true,
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
+            "validations": [
+                {"check": "unique", "reason": "duplicate_key"}
+            ],
             "example": "GEO-0001"
         },
         {
@@ -22,16 +25,16 @@
         {
             "name": "tipo",
             "type": "string",
-            "treatments": ["trim", "lowercase"],
+            "treatments": ["normalize"],
             "validations": [
                 {"check": "geofence_type_is_valid", "reason": "invalid_geofence_type"}
             ],
-            "example": ["centro_distribuicao", "pedagio", "posto_combustivel", "cliente"]
+            "example": ["CENTRO_DISTRIBUICAO", "PEDAGIO", "POSTO_COMBUSTIVEL", "CLIENTE"]
         },
         {
             "name": "uf",
             "type": "string",
-            "treatments": ["trim", "normalize"],
+            "treatments": ["normalize"],
             "example": "SP"
         },
         {

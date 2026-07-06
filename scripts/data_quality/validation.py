@@ -1,10 +1,4 @@
-"""Generic validation helpers shared by every pipeline.
-
-Validations never mutate valid values: they flag rows
-(`apply_table_validations` / `apply_quarantine`) or abort the pipeline
-when the data drifts from its table config (`enforce_table_config`).
-Value-changing logic lives in ``parser/treatment.py``.
-"""
+"""Generic validation helpers shared by every pipeline."""
 from __future__ import annotations
 
 from data_quality.statics import (
@@ -21,7 +15,7 @@ from data_quality.statics import (
 )
 from parser.parser_cnh import cnh_category_is_valid, cnh_is_valid
 from parser.parser_cpf import cpf_is_valid
-from pyspark.sql import Column, DataFrame
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 
@@ -39,11 +33,7 @@ def required(column: Column) -> Column:
 
 
 def plate_is_valid(column: Column) -> Column:
-    """Validate a Brazilian license plate.
-
-    Accepts the old format (`ABC1234`) and the Mercosul format
-    (`ABC1D23`). The value is expected to be already trimmed and
-    uppercased by the treatments.
+    """Validate a Brazilian license plate (old `ABC1234` or Mercosul `ABC1D23`).
 
     Args:
         column: String column with the plate to check.
@@ -56,9 +46,6 @@ def plate_is_valid(column: Column) -> Column:
 
 def coordinates_are_in_brazil(latitude: Column, longitude: Column) -> Column:
     """Validate a GPS coordinate pair against broad Brazil bounds.
-
-    The zeroed ``(0, 0)`` sentinel is intentionally left to the
-    dedicated ``non_zero`` checks so the reason remains precise.
 
     Args:
         latitude: Latitude column.
@@ -85,11 +72,6 @@ GEOJSON_POLYGON_SCHEMA = "type string, coordinates array<array<array<double>>>"
 def _polygon_checks(column: Column) -> tuple[Column, Column, Column]:
     """Build the expressions shared by the GeoJSON Polygon checks.
 
-    Single definition of what a structurally valid polygon is, shared
-    by `geojson_polygon_is_valid` and `geojson_polygon_is_in_brazil`.
-    The expressions are not null-safe: an unparseable geometry yields
-    null, and each caller decides how nulls count for its concern.
-
     Args:
         column: String column holding the GeoJSON geometry.
 
@@ -115,12 +97,6 @@ def _polygon_checks(column: Column) -> tuple[Column, Column, Column]:
 def geojson_polygon_is_valid(column: Column) -> Column:
     """Validate a GeoJSON Polygon serialized as a JSON string.
 
-    Structural check on the outer ring: the value must parse as a
-    ``Polygon`` whose ring has at least 4 points and contains no
-    zeroed ``(0, 0)`` coordinate (the "null island" defect). A null
-    geometry passes, so presence can be flagged separately by
-    ``required`` under its own reason.
-
     Args:
         column: String column holding the GeoJSON geometry.
 
@@ -134,11 +110,6 @@ def geojson_polygon_is_valid(column: Column) -> Column:
 
 def geojson_polygon_is_in_brazil(column: Column) -> Column:
     """Validate that a GeoJSON Polygon's outer ring is inside Brazil bounds.
-
-    This check only owns the geographic-bounds concern. Null,
-    unparseable, non-Polygon, degenerate or zeroed geometries pass here
-    so `required` and `geojson_polygon_is_valid` can record the precise
-    structural reason.
 
     Args:
         column: String column holding the GeoJSON geometry.
@@ -167,6 +138,13 @@ def geojson_polygon_is_in_brazil(column: Column) -> Column:
     return column.isNull() | ~valid_geometry | ~has_outside_point
 
 
+# Config check name for the windowed uniqueness check. It is not a
+# per-value predicate like the entries in ``VALIDATIONS``: it depends on
+# the other rows, so `_resolve_unique_checks` materializes it into a flag
+# column (single, stable window pass) instead of `_resolve_checks`.
+UNIQUE_CHECK = "unique"
+
+
 # Checks a table config can declare on a column (`validations`). Each
 # check maps to a boolean column that is True when the value is valid;
 # `apply_table_validations` wraps it null-safely (null => invalid).
@@ -193,10 +171,6 @@ VALIDATIONS = {
 
 def apply_quarantine(df: DataFrame, checks: dict[str, Column]) -> DataFrame:
     """Flag rows that fail data-quality checks without dropping them.
-
-    Failing rows keep their primary key so joins with other tables
-    still work; the reason is recorded in `dq_observations` and the
-    overall row status in `quality_ok`.
 
     Args:
         df: DataFrame to validate.
@@ -247,6 +221,9 @@ def _resolve_checks(
             continue
         for validation in entry.get("validations", []):
             check, reason = validation["check"], validation["reason"]
+            if check == UNIQUE_CHECK:
+                # Windowed, multi-row check: handled by _resolve_unique_checks.
+                continue
             if check not in VALIDATIONS:
                 raise ValueError(
                     f"Unknown validation '{check}' for column '{name}' "
@@ -289,16 +266,58 @@ def _null_failing_values(df: DataFrame, column_conditions: dict[str, list[Column
     return df
 
 
+def _resolve_unique_checks(
+    df: DataFrame, config: dict
+) -> tuple[DataFrame, dict[str, Column], dict[str, list[Column]], list[str]]:
+    """Materialize each ``unique`` validation into a reusable flag column.
+
+    Args:
+        df: DataFrame already standardized by the treatments.
+        config: Parsed table config; a ``unique`` validation names the
+            columns that must be distinct.
+
+    Returns:
+        The DataFrame with the helper flag columns added, plus the
+        ``unique`` checks (reason -> valid condition), the columns to
+        null on a duplicate (mapped to that condition) and the helper
+        column names to drop once the quarantine is built.
+    """
+    primary_key = [
+        entry["name"]
+        for entry in config["schema"]
+        if entry.get("key") and not entry.get("new_name")
+    ]
+    checks: dict[str, Column] = {}
+    column_conditions: dict[str, list[Column]] = {}
+    helpers: list[str] = []
+    for entry in config["schema"]:
+        if entry.get("new_name"):
+            continue
+        for validation in entry.get("validations", []):
+            if validation["check"] != UNIQUE_CHECK:
+                continue
+            unique_columns = validation.get("columns", [entry["name"]])
+            if any(column not in df.columns for column in unique_columns):
+                continue
+            ordering = Window.partitionBy(*unique_columns).orderBy(
+                *(primary_key or unique_columns)
+            )
+            has_value = None
+            for column in unique_columns:
+                present = F.col(column).isNotNull() & (F.col(column) != "")
+                has_value = present if has_value is None else has_value & present
+            is_first = (F.row_number().over(ordering) == 1) | ~has_value
+            flag = f"__unique_ok_{validation['reason']}"
+            df = df.withColumn(flag, is_first)
+            checks[validation["reason"]] = F.col(flag)
+            for column in unique_columns:
+                column_conditions.setdefault(column, []).append(F.col(flag))
+            helpers.append(flag)
+    return df, checks, column_conditions, helpers
+
+
 def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
     """Run the validations declared in the table config (quarantine).
-
-    Each ``schema`` entry may declare ``validations``: a list of
-    ``{"check", "reason"}`` pairs, where ``check`` is a key of
-    ``VALIDATIONS`` and ``reason`` is the label recorded in
-    `dq_observations`. Every check is wrapped null-safely (a null
-    boolean counts as invalid). Failing rows are flagged, never
-    dropped, and the failing value is nulled out - the row keeps its
-    primary key so joins still work.
 
     Args:
         df: DataFrame already standardized by the treatments.
@@ -315,20 +334,18 @@ def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
             must abort instead of being skipped.
     """
     checks, column_conditions = _resolve_checks(df, config)
+    df, unique_checks, unique_conditions, helpers = _resolve_unique_checks(df, config)
+    checks.update(unique_checks)
+    for column, conditions in unique_conditions.items():
+        column_conditions.setdefault(column, []).extend(conditions)
+
     df = apply_quarantine(df, checks)
-    return _null_failing_values(df, column_conditions)
+    df = _null_failing_values(df, column_conditions)
+    return df.drop(*helpers) if helpers else df
 
 
 def enforce_table_config(df: DataFrame, config: dict) -> DataFrame:
     """Validate a DataFrame against a table config and order its columns.
-
-    The config is the table's contract: every non-partition column
-    declared in ``schema`` must be present with the declared type,
-    otherwise the pipeline fails instead of writing a table that
-    drifted from its config. Partition columns (``partitioned_by``)
-    are not required in the DataFrame - they only materialize in the
-    path when the partition is written. Columns not declared in the
-    config are dropped.
 
     Args:
         df: DataFrame about to be written to the table.

@@ -1,33 +1,4 @@
-"""DAG ``analytics_posicoes_geocercas`` - geospatial position enrichment.
-
-Flow across the lakehouse layers, partitioned by ingestion date::
-
-    lakehouse/staging/posicoes/ingest_date=YYYY-MM-DD
-    lakehouse/staging/geocercas/ingest_date=YYYY-MM-DD
-      |-(enrich_to_analytics)-> lakehouse/analytics/posicoes_geocercas/ingest_date=YYYY-MM-DD
-
-The DAG is thin on purpose: all PySpark enrichment logic lives in
-``analytics/posicoes_geocercas.py`` and the analytics table contract in
-``analytics_posicoes_geocercas.json``.
-
-Data-aware scheduling: instead of a cron, the DAG runs when the
-``staging_posicoes`` and ``staging_geocercas`` Assets are published by
-the staging DAGs, so analytics never reads a partition that has not
-been written yet.
-
-The output is a Delta table: each run atomically replaces only its own
-``ingest_date`` partition (``replaceWhere``, the run's ``logical_date``).
-Different dates coexist; reprocessing the same date only overwrites that
-partition.
-
-**Idempotency via pre-check:** before doing any work, the task checks
-the partition's processed marker (written under ``_markers/`` after the
-Delta commit). If it exists, the task is skipped
-(``AirflowSkipException``) instead of reprocessing.
-
-The task publishes the ``analytics_posicoes_geocercas`` Asset, the
-data-aware trigger for downstream consumers of the enriched positions.
-"""
+"""DAG ``analytics_posicoes_geocercas`` - enriches tracking positions with geofence events."""
 from __future__ import annotations
 
 import logging
@@ -36,7 +7,10 @@ import pendulum
 from airflow.exceptions import AirflowSkipException
 from airflow.sdk import Asset, dag, task
 
-from analytics.posicoes_geocercas import ANALYTICS_DIR, transform_to_analytics
+from analytics.posicoes_geocercas.posicoes_geocercas import (
+    ANALYTICS_DIR,
+    transform_to_analytics,
+)
 from connections.spark_session import run_spark
 from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import resolve_ingest_date
@@ -87,7 +61,9 @@ def analytics_posicoes_geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
+        log.info("Enrichment task started - ingest_date=%s", ingest_date)
 
+        log.info("Checking analytics partition marker at %s", ANALYTICS_DIR)
         if delta_partition_processed(ANALYTICS_DIR, ingest_date):
             log.info(
                 "Analytics for %s already processed (%s) - skipping enrichment",
@@ -95,6 +71,7 @@ def analytics_posicoes_geocercas():
                 ANALYTICS_DIR,
             )
             raise AirflowSkipException(f"analytics ingest_date={ingest_date} already exists")
+        log.info("Analytics partition ingest_date=%s not processed yet - enriching", ingest_date)
 
         metrics = run_spark(
             "analytics_posicoes_geocercas_transform",

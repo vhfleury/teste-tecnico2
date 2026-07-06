@@ -1,20 +1,12 @@
-"""Generic staging pipeline driven by source and table config.
-
-This module owns the shared raw -> staging flow for declarative
-sources. Source-specific rules stay in ``staging_<source>.json``;
-this runner only knows how to read each raw input format, add runtime
-metadata, apply the generic treatment/validation engine and write the
-staging partition. Both layers are Delta tables: every write replaces
-only its own ``ingest_date`` partition and sets the processed marker
-right after the commit.
-"""
+"""Generic staging pipeline driven by source and table config."""
 from __future__ import annotations
 
 import logging
 import os
 from copy import deepcopy
-from typing import Any
+from typing import Any, Callable
 
+from data_quality.quality_report import rejection_metrics, split_by_quality
 from data_quality.validation import apply_table_validations, enforce_table_config
 from general.delta_io import (
     mark_delta_partition_processed,
@@ -200,6 +192,85 @@ def clean_and_validate(raw: DataFrame, config: dict) -> DataFrame:
     return df.withColumn("processed_at", F.current_timestamp())
 
 
+def run_staging_transform(
+    spark: SparkSession,
+    source: str,
+    ingest_date: str,
+    *,
+    raw_dir: str,
+    staging_dir: str,
+    config_path: str,
+    clean: Callable[[DataFrame, dict], DataFrame],
+) -> dict:
+    """Run the shared raw -> staging transform flow for one source.
+
+    Args:
+        spark: Active SparkSession (must be created with
+            ``enable_delta=True``).
+        source: Source name, used for logging and metrics.
+        ingest_date: Ingestion date in ``YYYY-MM-DD`` format, used to
+            locate raw and to partition staging.
+        raw_dir: Base directory of the source's raw table.
+        staging_dir: Base directory of the source's staging table.
+        config_path: Path to the table config JSON (the staging
+            contract).
+        clean: The source's treatment chain, invoked as
+            ``clean(raw, config)``.
+
+    Returns:
+        Metrics about the write: layer name, destination table,
+        ingestion date, input/output record counts and how many were
+        rejected (with percentage and count per reason).
+    """
+    log.info(
+        "Starting transform for %s - reading raw layer from %s (ingest_date=%s)",
+        source,
+        raw_dir,
+        ingest_date,
+    )
+    raw = read_delta_partition(spark, raw_dir, ingest_date)
+    total_in = raw.count()
+    log.info("Raw layer read for %s: %d records", source, total_in)
+
+    config = load_table_config(config_path)
+    df = clean(raw, config)
+    df = enforce_table_config(df, config)
+    log.info(
+        "Treatments applied and schema validated against table config '%s'",
+        config["table_name"],
+    )
+
+    approved, rejected = split_by_quality(df)
+
+    log.info("Writing staging layer for %s to %s (Delta)", source, staging_dir)
+    write_delta_partition(approved, staging_dir, ingest_date)
+    mark_delta_partition_processed(staging_dir, ingest_date)
+
+    total_out = approved.count()
+    quality = rejection_metrics(rejected, total_out)
+    rejected_count = quality["records_rejected"]
+
+    dropped = total_in - total_out - rejected_count
+    if dropped:
+        log.info("%d record(s) dropped for %s (missing key)", dropped, source)
+
+    log.info(
+        "Transform finished for %s - %d in staging, %d rejected and discarded",
+        source,
+        total_out,
+        rejected_count,
+    )
+    return {
+        "layer": "staging",
+        "source": source,
+        "path": staging_dir,
+        "ingest_date": ingest_date,
+        "records_in": total_in,
+        "records_out": total_out,
+        **quality,
+    }
+
+
 def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> dict:
     """Read raw, apply the source table config and write staging.
 
@@ -213,62 +284,14 @@ def transform_to_staging(spark: SparkSession, source: str, ingest_date: str) -> 
     Returns:
         Metrics about the write: layer name, destination table,
         ingestion date, input/output record counts and how many were
-        flagged for quality.
+        rejected (with percentage and count per reason).
     """
-    raw_source = raw_dir_for(source)
-    log.info(
-        "Starting transform for %s - reading raw layer from %s (ingest_date=%s)",
+    return run_staging_transform(
+        spark,
         source,
-        raw_source,
         ingest_date,
+        raw_dir=raw_dir_for(source),
+        staging_dir=staging_dir_for(source),
+        config_path=table_config_path(source),
+        clean=clean_and_validate,
     )
-    raw = read_delta_partition(spark, raw_source, ingest_date)
-    total_in = raw.count()
-    log.info("Raw layer read for %s: %d records", source, total_in)
-
-    config = load_table_config(table_config_path(source))
-    df = clean_and_validate(raw, config)
-    df = enforce_table_config(df, config)
-    log.info(
-        "Treatments applied and schema validated against table config '%s'",
-        config["table_name"],
-    )
-
-    destination = staging_dir_for(source)
-    log.info("Writing staging layer for %s to %s (Delta)", source, destination)
-    write_delta_partition(df, destination, ingest_date)
-    mark_delta_partition_processed(destination, ingest_date)
-
-    total_out = df.count()
-    flagged = df.filter(~F.col("quality_ok")).count()
-
-    dropped = total_in - total_out
-    if dropped:
-        log.info("%d record(s) dropped for %s (missing key or duplicate)", dropped, source)
-
-    if flagged:
-        reasons = (
-            df.filter(~F.col("quality_ok"))
-            .select(F.explode(F.split("dq_observations", ";")).alias("reason"))
-            .groupBy("reason")
-            .count()
-            .collect()
-        )
-        for row in sorted(reasons, key=lambda item: item["reason"]):
-            log.info("  quality - %s: %d", row["reason"], row["count"])
-
-    log.info(
-        "Transform finished for %s - %d in staging, %d flagged for quality",
-        source,
-        total_out,
-        flagged,
-    )
-    return {
-        "layer": "staging",
-        "source": source,
-        "path": destination,
-        "ingest_date": ingest_date,
-        "records_in": total_in,
-        "records_out": total_out,
-        "records_flagged": flagged,
-    }

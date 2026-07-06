@@ -1,33 +1,4 @@
-"""DAG ``geocercas`` - ingestion and quality of the geofence registry.
-
-Flow across the lakehouse layers, partitioned by ingestion date::
-
-    data/geocercas/geocercas.geojson
-      |-(extract_to_raw)->  lakehouse/raw/geocercas/ingest_date=YYYY-MM-DD
-          |-(transform_to_staging)->  lakehouse/staging/geocercas/ingest_date=YYYY-MM-DD
-
-The DAG is thin on purpose: all PySpark logic lives in
-``pipelines/geocercas/geocercas.py`` and the staging contract
-(columns, treatments, validations, key) in ``staging_geocercas.json``.
-
-Both layers are Delta tables: each run atomically replaces only its own
-``ingest_date`` partition (``replaceWhere``, the run's ``logical_date``).
-Different dates coexist; reprocessing the same date only overwrites that
-partition.
-
-**Idempotency via pre-check:** before doing any work, each task checks
-the partition's processed marker (written under ``_markers/`` after each
-Delta commit). If it exists, the task is skipped
-(``AirflowSkipException``) instead of reprocessing. The transform task uses
-``trigger_rule="none_failed"`` so it can still run its own check even when
-the extraction task was skipped because raw already existed.
-
-Tasks communicate through the persisted layer (the raw Delta table), not
-XCom: each one reads/writes the lakehouse and can be re-run independently.
-
-The final task publishes the ``staging_geocercas`` Asset, the data-aware
-trigger for the future gold DAG (geospatial enrichment + trip fact table).
-"""
+"""DAG ``geocercas`` - ingests the geofence registry from GeoJSON to raw and staging."""
 from __future__ import annotations
 
 import logging
@@ -43,6 +14,7 @@ from pipelines.geocercas.geocercas import (
     extract_to_raw,
     transform_to_staging,
 )
+from scripts.data_quality.quality_report import log_rejection_alert
 from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import resolve_ingest_date
 
@@ -91,7 +63,9 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
+        log.info("Extract task started for geocercas - ingest_date=%s", ingest_date)
 
+        log.info("Checking raw partition marker at %s", RAW_DIR)
         if delta_partition_processed(RAW_DIR, ingest_date):
             log.info(
                 "Raw for %s already processed (%s) - skipping extraction",
@@ -99,6 +73,7 @@ def geocercas():
                 RAW_DIR,
             )
             raise AirflowSkipException(f"raw ingest_date={ingest_date} already exists")
+        log.info("Raw partition ingest_date=%s not processed yet - extracting", ingest_date)
 
         metrics = run_spark("geocercas_extract", extract_to_raw, ingest_date, enable_delta=True)
         log.info("Raw layer written: %s", metrics)
@@ -124,7 +99,9 @@ def geocercas():
                 `ingest_date` was already processed.
         """
         ingest_date = resolve_ingest_date(context)  # YYYY-MM-DD
+        log.info("Transform task started for geocercas - ingest_date=%s", ingest_date)
 
+        log.info("Checking staging partition marker at %s", STAGING_DIR)
         if delta_partition_processed(STAGING_DIR, ingest_date):
             log.info(
                 "Staging for %s already processed (%s) - skipping transform",
@@ -132,18 +109,35 @@ def geocercas():
                 STAGING_DIR,
             )
             raise AirflowSkipException(f"staging ingest_date={ingest_date} already exists")
+        log.info("Staging partition ingest_date=%s not processed yet - transforming", ingest_date)
 
         metrics = run_spark(
             "geocercas_transform", transform_to_staging, ingest_date, enable_delta=True
         )
         log.info(
-            "Staging layer written: %s records (%s flagged for quality)",
+            "Staging layer written: %s records (%s rejected and discarded)",
             metrics["records_out"],
-            metrics["records_flagged"],
+            metrics["records_rejected"],
         )
         return metrics
 
-    extract_to_raw_task() >> transform_to_staging_task()
+    @task(task_id="data_quality")
+    def data_quality_task(metrics: dict) -> None:
+        """Log the data-quality alert for the partition's rejected rows.
+
+        Args:
+            metrics: Transform metrics received via XCom, with the
+                rejected count, percentage and count per reason.
+        """
+        log.info(
+            "Data quality task started for geocercas - ingest_date=%s",
+            metrics["ingest_date"],
+        )
+        log_rejection_alert(metrics)
+
+    staging_metrics = transform_to_staging_task()
+    extract_to_raw_task() >> staging_metrics
+    data_quality_task(staging_metrics)
 
 
 geocercas()

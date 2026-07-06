@@ -1,12 +1,4 @@
-"""Fixture infrastructure of the pipeline golden tests.
-
-How a pipeline's fixtures become a tested DataFrame: discovery of the
-pipelines shipping the fixture trio, loading of the JSON fixtures,
-inference of the raw-layer schema and execution of the pipeline's
-treatment chain. Shared by the golden test (``test_staging.py``) and
-the expected-file regeneration script (``regenerate_expected.py``),
-so both always run the same chain.
-"""
+"""Fixture infrastructure of the pipeline golden tests."""
 import importlib
 import json
 import os
@@ -34,9 +26,7 @@ def discover_pipelines(require_expected: bool = True) -> list[str]:
     """List the pipelines under pipelines/ that ship golden fixtures.
 
     Args:
-        require_expected: When False, the expected output file is not
-            required - used by the regeneration script to create the
-            very first golden of a new pipeline.
+        require_expected: When False, the expected output file is not required.
 
     Returns:
         Sorted pipeline names.
@@ -112,12 +102,6 @@ def _resolve_unknown(data_type: DataType) -> DataType:
 def infer_raw_schema(rows: list[dict]) -> StructType:
     """Build the raw-layer schema of an input fixture, merged across rows.
 
-    Mirrors how the raw layer is read (`primitivesAsString`): every
-    leaf is a string. Flat sources give flat all-string columns;
-    nested sources (e.g. a GeoJSON FeatureCollection) give structs
-    and arrays with string leaves. Fields missing from a row are
-    filled with null when the DataFrame is built.
-
     Args:
         rows: Raw rows loaded from the input fixture.
 
@@ -131,13 +115,7 @@ def infer_raw_schema(rows: list[dict]) -> StructType:
 
 
 def resolve_clean_and_validate(name: str):
-    """Locate the treatment chain a pipeline runs on fixtures.
-
-    Pipelines with exclusive treatment ship their own
-    ``clean_and_validate`` in ``pipelines/<name>/<name>.py``;
-    declarative sources have no module and run the generic chain
-    from ``staging_pipeline``.
-    """
+    """Locate the treatment chain a pipeline runs on fixtures."""
     try:
         module = importlib.import_module(f"{name}.{name}")
     except ModuleNotFoundError as error:
@@ -149,10 +127,6 @@ def resolve_clean_and_validate(name: str):
 
 def produce_staging(spark, name: str) -> tuple[list[dict], list[str]]:
     """Run a pipeline's real treatment chain over its input fixture.
-
-    Single source of truth for how a pipeline runs on fixtures: used
-    by the golden test and by the expected-file regeneration script,
-    so both always execute the same chain.
 
     Args:
         spark: Active SparkSession.

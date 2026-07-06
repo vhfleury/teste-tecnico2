@@ -1,13 +1,4 @@
-"""Generic data treatments shared by every pipeline.
-
-This module executes what a table config declares for each column:
-the ``treatments`` chain (keys of ``TREATMENTS``, applied in order),
-the cast to the declared ``type`` and the deduplication by the
-declared ``key`` columns (`apply_table_treatments`), plus the
-``new_name`` derived columns (`apply_derived_columns`). Validations
-that flag or abort instead of changing values live in
-``data_quality/validation.py``.
-"""
+"""Generic data treatments shared by every pipeline, driven by the table config."""
 from __future__ import annotations
 
 from parser.parser_cpf import normalize_cpf
@@ -17,15 +8,27 @@ from pyspark.sql import functions as F
 
 
 def normalize(column: Column) -> Column:
-    """Normalize a text column: all characters in uppercase.
+    """Normalize a text column: trim surrounding whitespace and uppercase.
 
     Args:
         column: String column to normalize.
 
     Returns:
-        The column with its text in uppercase.
+        The column trimmed and with its text in uppercase.
     """
-    return F.upper(column)
+    return F.upper(F.trim(column))
+
+
+def parse_date(column: Column) -> Column:
+    """Parse a date/datetime string into a timestamp (malformed -> null, not an abort).
+
+    Args:
+        column: String column holding the date or datetime.
+
+    Returns:
+        Timestamp column, null when the value cannot be parsed.
+    """
+    return F.to_timestamp(F.trim(column))
 
 
 # Treatments a table config can declare on a column (`treatments`),
@@ -34,7 +37,7 @@ def normalize(column: Column) -> Column:
 TREATMENTS = {
     "trim": F.trim,
     "normalize": normalize,
-    "lowercase": F.lower,
+    "parse_date": parse_date,
     "normalize_cpf": normalize_cpf,
     "normalize_telefone": normalize_telefone,
 }
@@ -52,9 +55,7 @@ def _apply_entry_treatments(column: Column, entry: dict, table: str) -> Column:
         The column with every declared treatment applied, in order.
 
     Raises:
-        ValueError: If a declared treatment is not in `TREATMENTS` -
-            the config demands exactly that treatment, so an unknown
-            one must abort instead of being skipped.
+        ValueError: If a declared treatment is not in `TREATMENTS`.
     """
     for treatment in entry.get("treatments", []):
         if treatment not in TREATMENTS:
@@ -81,35 +82,25 @@ def trim_columns(df: DataFrame, columns: list[str]) -> DataFrame:
     return df
 
 
-def deduplicate_by_key(df: DataFrame, key_columns: list[str]) -> DataFrame:
-    """Drop rows with a null/empty key and deduplicate by key.
+def drop_null_keys(df: DataFrame, key_columns: list[str]) -> DataFrame:
+    """Drop rows whose primary key is null or empty; duplicates flagged by ``unique``.
 
     Args:
         df: DataFrame to transform.
         key_columns: Columns that make up the row's primary key.
 
     Returns:
-        A DataFrame without null/empty keys or duplicate keys.
+        A DataFrame without null/empty keys.
     """
     has_key = None
     for column in key_columns:
         column_has_value = F.col(column).isNotNull() & (F.col(column) != "")
         has_key = column_has_value if has_key is None else has_key & column_has_value
-    return df.filter(has_key).dropDuplicates(key_columns)
+    return df.filter(has_key)
 
 
 def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
-    """Standardize the DataFrame as declared in the table config.
-
-    For every schema entry whose column exists in the DataFrame:
-    apply the declared ``treatments`` in order, then cast to the
-    declared ``type`` (the raw layer reads every primitive as a
-    string, so typing happens here). Entries with ``new_name`` are
-    derived columns, handled later by `apply_derived_columns`;
-    entries absent from the DataFrame (partition and metadata columns
-    added downstream) are skipped - `enforce_table_config` catches a
-    genuinely missing column before the write. Finally, rows are
-    deduplicated by the entries marked ``key``.
+    """Apply each entry's treatments, cast to the declared type and drop keyless rows.
 
     Args:
         df: DataFrame read from the raw layer.
@@ -117,7 +108,7 @@ def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
             with `name`, `type` and optional `treatments` / `key`).
 
     Returns:
-        The standardized, deduplicated DataFrame.
+        The standardized DataFrame with keyless rows dropped.
 
     Raises:
         ValueError: If a declared treatment is not in `TREATMENTS`.
@@ -138,17 +129,12 @@ def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
         if entry.get("key") and not entry.get("new_name")
     ]
     if key_columns:
-        df = deduplicate_by_key(df, key_columns)
+        df = drop_null_keys(df, key_columns)
     return df
 
 
 def apply_derived_columns(df: DataFrame, config: dict) -> DataFrame:
-    """Create the ``new_name`` derived columns declared in the config.
-
-    Runs after the validations so a derived column (e.g. the
-    digits-only CPF) is computed from the final, quarantined value of
-    its source column - an invalid source that was nulled out derives
-    null, not a normalized copy of a bad value.
+    """Create the ``new_name`` derived columns after the validations (nulled source -> null).
 
     Args:
         df: DataFrame already treated and validated.
