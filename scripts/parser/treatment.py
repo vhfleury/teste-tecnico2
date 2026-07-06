@@ -2,9 +2,10 @@
 
 This module executes what a table config declares for each column:
 the ``treatments`` chain (keys of ``TREATMENTS``, applied in order),
-the cast to the declared ``type`` and the deduplication by the
-declared ``key`` columns (`apply_table_treatments`), plus the
-``new_name`` derived columns (`apply_derived_columns`). Validations
+the cast to the declared ``type`` and dropping rows without a value
+for the declared ``key`` columns (`apply_table_treatments`; duplicate
+keys are flagged by the ``unique`` validation, not dropped here), plus
+the ``new_name`` derived columns (`apply_derived_columns`). Validations
 that flag or abort instead of changing values live in
 ``data_quality/validation.py``.
 """
@@ -84,21 +85,27 @@ def trim_columns(df: DataFrame, columns: list[str]) -> DataFrame:
     return df
 
 
-def deduplicate_by_key(df: DataFrame, key_columns: list[str]) -> DataFrame:
-    """Drop rows with a null/empty key and deduplicate by key.
+def drop_null_keys(df: DataFrame, key_columns: list[str]) -> DataFrame:
+    """Drop rows whose primary key is null or empty.
+
+    A row without a key cannot be keyed, deduplicated or joined, so it
+    is removed before the quality checks run. Duplicate keys are NOT
+    dropped here: the ``unique`` validation flags them as a quality
+    issue (reason recorded in ``dq_observations``) so the rejected rows
+    are counted in the data-quality alert instead of vanishing silently.
 
     Args:
         df: DataFrame to transform.
         key_columns: Columns that make up the row's primary key.
 
     Returns:
-        A DataFrame without null/empty keys or duplicate keys.
+        A DataFrame without null/empty keys.
     """
     has_key = None
     for column in key_columns:
         column_has_value = F.col(column).isNotNull() & (F.col(column) != "")
         has_key = column_has_value if has_key is None else has_key & column_has_value
-    return df.filter(has_key).dropDuplicates(key_columns)
+    return df.filter(has_key)
 
 
 def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
@@ -111,8 +118,9 @@ def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
     derived columns, handled later by `apply_derived_columns`;
     entries absent from the DataFrame (partition and metadata columns
     added downstream) are skipped - `enforce_table_config` catches a
-    genuinely missing column before the write. Finally, rows are
-    deduplicated by the entries marked ``key``.
+    genuinely missing column before the write. Finally, rows without a
+    value for the entries marked ``key`` are dropped (duplicate keys are
+    flagged by the ``unique`` validation, not dropped here).
 
     Args:
         df: DataFrame read from the raw layer.
@@ -120,7 +128,7 @@ def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
             with `name`, `type` and optional `treatments` / `key`).
 
     Returns:
-        The standardized, deduplicated DataFrame.
+        The standardized DataFrame with keyless rows dropped.
 
     Raises:
         ValueError: If a declared treatment is not in `TREATMENTS`.
@@ -141,7 +149,7 @@ def apply_table_treatments(df: DataFrame, config: dict) -> DataFrame:
         if entry.get("key") and not entry.get("new_name")
     ]
     if key_columns:
-        df = deduplicate_by_key(df, key_columns)
+        df = drop_null_keys(df, key_columns)
     return df
 
 

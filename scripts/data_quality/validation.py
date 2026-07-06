@@ -21,7 +21,7 @@ from data_quality.statics import (
 )
 from parser.parser_cnh import cnh_category_is_valid, cnh_is_valid
 from parser.parser_cpf import cpf_is_valid
-from pyspark.sql import Column, DataFrame
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 
@@ -167,6 +167,13 @@ def geojson_polygon_is_in_brazil(column: Column) -> Column:
     return column.isNull() | ~valid_geometry | ~has_outside_point
 
 
+# Config check name for the windowed uniqueness quarantine. It is not
+# a per-value predicate like the entries in ``VALIDATIONS``: it depends
+# on the other rows, so it is handled by `apply_unique_quarantine`
+# (single, stable window pass) instead of `_resolve_checks`.
+UNIQUE_CHECK = "unique"
+
+
 # Checks a table config can declare on a column (`validations`). Each
 # check maps to a boolean column that is True when the value is valid;
 # `apply_table_validations` wraps it null-safely (null => invalid).
@@ -247,6 +254,9 @@ def _resolve_checks(
             continue
         for validation in entry.get("validations", []):
             check, reason = validation["check"], validation["reason"]
+            if check == UNIQUE_CHECK:
+                # Windowed, multi-row check: handled by apply_unique_quarantine.
+                continue
             if check not in VALIDATIONS:
                 raise ValueError(
                     f"Unknown validation '{check}' for column '{name}' "
@@ -289,6 +299,73 @@ def _null_failing_values(df: DataFrame, column_conditions: dict[str, list[Column
     return df
 
 
+def apply_unique_quarantine(df: DataFrame, config: dict) -> DataFrame:
+    """Flag duplicate rows on a ``unique`` column, keeping the first one.
+
+    Uniqueness is a windowed, multi-row check, so unlike the per-value
+    validations it is computed once into a helper column and reused: the
+    reason is appended to ``dq_observations``, ``quality_ok`` recomputed
+    and the value nulled, all from that single column so the flag and the
+    null always land on the same physical row (two separate window passes
+    could disagree on which row is the first). Duplicates are then
+    discarded like any rejected row, which counts them in the
+    data-quality alert instead of dropping them silently.
+
+    Two details make it safe on a non-key column (e.g. a duplicate
+    invoice number, not just the primary key):
+
+    * Null is not a duplicate of null (SQL ``UNIQUE`` semantics), so a
+      missing value never flags — it is already caught by ``required``.
+    * The kept row is the one first by primary key, a deterministic
+      tie-break, so which duplicate is flagged never varies between runs.
+
+    Args:
+        df: DataFrame already flagged by `apply_quarantine`
+            (`dq_observations`/`quality_ok` present).
+        config: Parsed table config; a ``unique`` validation names the
+            columns that must be distinct.
+
+    Returns:
+        The DataFrame with duplicate rows flagged and their value nulled.
+    """
+    primary_key = [
+        entry["name"]
+        for entry in config["schema"]
+        if entry.get("key") and not entry.get("new_name")
+    ]
+    for entry in config["schema"]:
+        if entry.get("new_name"):
+            continue
+        for validation in entry.get("validations", []):
+            if validation["check"] != UNIQUE_CHECK:
+                continue
+            unique_columns = validation.get("columns", [entry["name"]])
+            if any(column not in df.columns for column in unique_columns):
+                continue
+            ordering = Window.partitionBy(*unique_columns).orderBy(
+                *(primary_key or unique_columns)
+            )
+            has_value = None
+            for column in unique_columns:
+                present = F.col(column).isNotNull()
+                has_value = present if has_value is None else has_value & present
+            is_duplicate = (F.row_number().over(ordering) > 1) & has_value
+            df = df.withColumn("is_duplicate", is_duplicate)
+            df = df.withColumn(
+                "dq_observations",
+                F.concat_ws(
+                    ";",
+                    F.when(F.length("dq_observations") > 0, F.col("dq_observations")),
+                    F.when(F.col("is_duplicate"), F.lit(validation["reason"])),
+                ),
+            )
+            df = df.withColumn("quality_ok", F.length("dq_observations") == 0)
+            for column in unique_columns:
+                df = df.withColumn(column, F.when(~F.col("is_duplicate"), F.col(column)))
+            df = df.drop("is_duplicate")
+    return df
+
+
 def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
     """Run the validations declared in the table config (quarantine).
 
@@ -298,7 +375,9 @@ def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
     `dq_observations`. Every check is wrapped null-safely (a null
     boolean counts as invalid). Failing rows are flagged, never
     dropped, and the failing value is nulled out - the row keeps its
-    primary key so joins still work.
+    primary key so joins still work. The ``unique`` check is special
+    (windowed): `apply_unique_quarantine` flags duplicate keys after
+    the per-value checks so they, too, reach the data-quality alert.
 
     Args:
         df: DataFrame already standardized by the treatments.
@@ -316,7 +395,8 @@ def apply_table_validations(df: DataFrame, config: dict) -> DataFrame:
     """
     checks, column_conditions = _resolve_checks(df, config)
     df = apply_quarantine(df, checks)
-    return _null_failing_values(df, column_conditions)
+    df = _null_failing_values(df, column_conditions)
+    return apply_unique_quarantine(df, config)
 
 
 def enforce_table_config(df: DataFrame, config: dict) -> DataFrame:
