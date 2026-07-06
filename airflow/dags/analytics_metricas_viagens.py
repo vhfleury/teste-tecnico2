@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 import pendulum
+from _defaults import DEFAULT_ARGS
 from airflow.exceptions import AirflowSkipException
 from airflow.sdk import Asset, dag, task
 
@@ -16,15 +17,6 @@ from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import layer_dir, resolve_ingest_date
 
 log = logging.getLogger(__name__)
-
-TASK_RETRIES = 2
-RETRY_DELAY = pendulum.duration(minutes=1)
-
-DEFAULT_ARGS = {
-    "owner": "data-eng",
-    "retries": TASK_RETRIES,
-    "retry_delay": RETRY_DELAY,
-}
 
 # Gold inputs this DAG schedules on (published by the analytics DAGs).
 ANALYTICS_VIAGENS_ENRIQUECIDAS = Asset("analytics_viagens_enriquecidas")

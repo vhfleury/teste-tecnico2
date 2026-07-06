@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 import pendulum
+from _defaults import DEFAULT_ARGS, STAGING_SCHEDULE
 from airflow.exceptions import AirflowSkipException
 from airflow.sdk import Asset, dag, task
 
@@ -19,17 +20,6 @@ from scripts.general.delta_io import delta_partition_processed
 from scripts.general.utils import resolve_ingest_date
 
 log = logging.getLogger(__name__)
-
-TASK_RETRIES = 2
-RETRY_DELAY = pendulum.duration(minutes=1)
-# Cadence at which the geofence source is polled for new data.
-STAGING_SCHEDULE = "*/10 * * * *"
-
-DEFAULT_ARGS = {
-    "owner": "data-eng",
-    "retries": TASK_RETRIES,
-    "retry_delay": RETRY_DELAY,
-}
 
 # Output of this source at the staging layer (the future gold DAG schedules on this asset).
 STAGING_GEOCERCAS = Asset("staging_geocercas")

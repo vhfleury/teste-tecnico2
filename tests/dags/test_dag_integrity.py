@@ -15,6 +15,7 @@ and inside the container.
 from __future__ import annotations
 
 import os
+import sys
 
 import pytest
 
@@ -23,11 +24,26 @@ pytest.importorskip("airflow")
 from airflow.models.dagbag import DagBag  # noqa: E402  (guarded by importorskip above)
 from staging_pipeline import active_sources  # noqa: E402  (sys.path wired in conftest)
 
-DAG_FOLDER = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "airflow",
-    "dags",
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Source tree keeps the DAGs under airflow/dags/; the container mounts that same
+# folder flattened at <root>/dags. Support both so the test runs in CI and in the
+# container.
+DAG_FOLDER = next(
+    (
+        candidate
+        for candidate in (
+            os.path.join(_REPO_ROOT, "airflow", "dags"),
+            os.path.join(_REPO_ROOT, "dags"),
+        )
+        if os.path.isdir(candidate)
+    ),
+    os.path.join(_REPO_ROOT, "airflow", "dags"),
 )
+
+# DAG modules import sibling helpers from the dags folder (e.g. ``_defaults``);
+# Airflow puts the dags folder on sys.path at runtime, so replicate that here.
+if DAG_FOLDER not in sys.path:
+    sys.path.insert(0, DAG_FOLDER)
 
 # The three analytics DAGs plus the dedicated geocercas DAG. The staging DAGs are
 # generated one per active source, so their ids come from the same registry the
