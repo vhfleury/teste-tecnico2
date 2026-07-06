@@ -17,6 +17,33 @@ jobs:
       - run: pip install ruff
       - run: ruff check .
 
+  # The transform suites never import the DAG modules (requirements.txt has no
+  # Airflow), so this job installs Airflow — matching the image version — and
+  # parses airflow/dags/ through a DagBag: a broken import or a bug in the
+  # dynamic staging-DAG loop fails here instead of reaching CI green. Import is
+  # enough (no JVM starts), so it needs no Java and no Docker.
+  dag-parse:
+    runs-on: ubuntu-latest
+    env:
+      AIRFLOW_HOME: ${{ runner.temp }}/airflow_home
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: install airflow (matches the image) + runtime deps
+        run: |
+          pip install "apache-airflow==3.1.5" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.1.5/constraints-3.11.txt"
+          pip install -r requirements.txt
+      - name: initialize airflow metadata db (sqlite)
+        run: airflow db migrate
+      - name: DAG parse smoke test
+        run: pytest tests/dags -q
+
   test:
     runs-on: ubuntu-latest
     env:

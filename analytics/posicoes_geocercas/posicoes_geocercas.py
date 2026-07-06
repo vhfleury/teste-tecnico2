@@ -125,7 +125,10 @@ def _position_base(positions: DataFrame) -> DataFrame:
 
 
 def match_positions_to_geofences(positions: DataFrame, geofences: DataFrame) -> DataFrame:
-    """Left-enrich each position with the best containing geofence, if any.
+    """Left-enrich each position with the best matching geofence, if any.
+
+    Matching uses ``ST_Intersects``, so a point exactly on a geofence
+    border counts as inside (see the predicate note below).
 
     Args:
         positions: Staging positions DataFrame.
@@ -133,7 +136,7 @@ def match_positions_to_geofences(positions: DataFrame, geofences: DataFrame) -> 
 
     Returns:
         The position base columns plus `geocerca_id`, `geocerca_nome`
-        and `geocerca_tipo` (null when no geofence contains the
+        and `geocerca_tipo` (null when no geofence matches the
         position).
     """
     SedonaContext.create(positions.sparkSession)
@@ -146,6 +149,9 @@ def match_positions_to_geofences(positions: DataFrame, geofences: DataFrame) -> 
         "posicao_id",
         stc.ST_Point("longitude", "latitude").alias("position_point"),
     )
+    # ST_Intersects (not ST_Contains): a point exactly on the geofence border
+    # counts as inside. ST_Contains treats the boundary as outside, which would
+    # drop positions sitting right on the fence line.
     matches = position_points.join(
         F.broadcast(geofence_base),
         stp.ST_Intersects(F.col("geofence_geometry"), F.col("position_point")),

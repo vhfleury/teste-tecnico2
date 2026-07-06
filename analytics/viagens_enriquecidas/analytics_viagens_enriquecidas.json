@@ -201,7 +201,7 @@
         {
             "name": "dq_observations",
             "type": "string",
-            "example": "driver_not_found;no_positions_found"
+            "example": "driver_not_found;vehicle_not_found"
         },
         {
             "name": "quality_ok",

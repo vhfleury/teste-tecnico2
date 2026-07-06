@@ -150,12 +150,14 @@ def _merge_quarantine(df: DataFrame) -> DataFrame:
         The DataFrame with the merged `dq_observations` /
         `quality_ok` columns and the helper columns dropped.
     """
+    # Only referential orphans are quality defects and get flagged/dropped. A
+    # trip with no GPS positions is incomplete tracking, not dirty data — it is
+    # kept (num_posicoes stays null), so "viagens concluídas" is not undercounted.
     checks = {
         "vehicle_not_found": F.col("veiculo_matched").isNotNull(),
         "driver_not_found": F.col("motorista_matched").isNotNull(),
         "origin_geofence_not_found": F.col("origem_matched").isNotNull(),
         "destination_geofence_not_found": F.col("destino_matched").isNotNull(),
-        "no_positions_found": F.col("num_posicoes").isNotNull(),
     }
     join_observations = F.concat_ws(
         ";",
@@ -256,9 +258,13 @@ def build_analytics(
     Returns:
         The final analytics DataFrame, matching the declared schema.
     """
-    return enforce_table_config(
-        enrich_trips(viagens, veiculos, motoristas, geocercas, posicoes), config
-    )
+    # LEFT JOIN from the fact: every trip is kept. Referential orphans are
+    # flagged in dq_observations / quality_ok, never dropped, so trip counts stay
+    # complete — a trip is not lost because a dimension it references was
+    # discarded upstream in staging. Consumers who want only consistent rows
+    # filter on quality_ok at read time.
+    enriched = enrich_trips(viagens, veiculos, motoristas, geocercas, posicoes)
+    return enforce_table_config(enriched, config)
 
 
 def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
@@ -273,7 +279,7 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
 
     Returns:
         Metrics about the write: layer name, destination path, record
-        count, how many trips were flagged by quarantine and how many
+        count, how many trips were flagged as orphans and how many
         are delayed.
     """
     staging_inputs = {
@@ -306,7 +312,7 @@ def transform_to_analytics(spark: SparkSession, ingest_date: str) -> dict:
     flagged = df.filter(~F.col("quality_ok")).count()
     delayed = df.filter(F.col("atrasada_flag")).count()
     log.info(
-        "Analytics transform finished - %d trips, %d flagged, %d delayed",
+        "Analytics transform finished - %d trips, %d flagged as orphan, %d delayed",
         total,
         flagged,
         delayed,

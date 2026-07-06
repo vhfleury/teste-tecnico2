@@ -12,7 +12,8 @@
             "status": "CONCLUIDA",
             "duracao_horas": 10.5,
             "atrasada_flag": false,
-            "mes": "2026-04"
+            "mes": "2026-04",
+            "dq_observations": ""
         },
         {
             "viagem_id": "VIA-000002",
@@ -26,7 +27,8 @@
             "status": "CONCLUIDA",
             "duracao_horas": 18.25,
             "atrasada_flag": true,
-            "mes": "2026-04"
+            "mes": "2026-04",
+            "dq_observations": ""
         },
         {
             "viagem_id": "VIA-000012",
@@ -40,7 +42,23 @@
             "status": "CONCLUIDA",
             "duracao_horas": 11.5,
             "atrasada_flag": false,
-            "mes": "2026-06"
+            "mes": "2026-06",
+            "dq_observations": ""
+        },
+        {
+            "viagem_id": "VIA-000099",
+            "veiculo_id": "VEI-0001",
+            "motorista_id": "MOT-9999",
+            "motorista_nome": null,
+            "geocerca_origem_id": "GEO-0001",
+            "geocerca_destino_id": "GEO-0002",
+            "origem_nome": "CD Sao Paulo - Guarulhos",
+            "destino_nome": "Cliente Rio de Janeiro - Centro",
+            "status": "CONCLUIDA",
+            "duracao_horas": 99.0,
+            "atrasada_flag": true,
+            "mes": "2026-06",
+            "dq_observations": "driver_not_found"
         }
     ],
     "analytics_posicoes_geocercas": [

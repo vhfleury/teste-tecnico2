@@ -24,7 +24,7 @@ TRIPS_SCHEMA = (
     "viagem_id string, veiculo_id string, motorista_id string, motorista_nome string, "
     "geocerca_origem_id string, geocerca_destino_id string, origem_nome string, "
     "destino_nome string, status string, duracao_horas double, atrasada_flag boolean, "
-    "mes string"
+    "mes string, dq_observations string"
 )
 GEOFENCE_POSITIONS_SCHEMA = (
     "posicao_id string, viagem_id string, veiculo_id string, timestamp string, "
